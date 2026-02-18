@@ -3,7 +3,7 @@
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       profiles: {
@@ -28,6 +28,7 @@ export interface Database {
           avatar_url?: string | null
           created_at?: string
         }
+        Relationships: []
       }
       subjects: {
         Row: {
@@ -57,6 +58,7 @@ export interface Database {
           is_active?: boolean
           created_at?: string
         }
+        Relationships: []
       }
       sessions: {
         Row: {
@@ -86,6 +88,7 @@ export interface Database {
           duration_seconds?: number
           status?: string
         }
+        Relationships: []
       }
       breaks: {
         Row: {
@@ -115,6 +118,7 @@ export interface Database {
           ended_at?: string | null
           duration_seconds?: number
         }
+        Relationships: []
       }
       groups: {
         Row: {
@@ -144,6 +148,7 @@ export interface Database {
           is_public?: boolean
           created_at?: string
         }
+        Relationships: []
       }
       group_members: {
         Row: {
@@ -167,6 +172,61 @@ export interface Database {
           role?: string
           joined_at?: string
         }
+        Relationships: []
+      }
+      practice_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          mode: 'stopwatch' | 'timer'
+          target_seconds: number
+          actual_seconds: number
+          passage_count: number
+          average_grade: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          mode: string
+          target_seconds: number
+          actual_seconds: number
+          passage_count?: number
+          average_grade?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          mode?: string
+          target_seconds?: number
+          actual_seconds?: number
+          passage_count?: number
+          average_grade?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      practice_passages: {
+        Row: {
+          id: string
+          practice_session_id: string
+          position: number
+          grade: number
+        }
+        Insert: {
+          id?: string
+          practice_session_id: string
+          position: number
+          grade: number
+        }
+        Update: {
+          id?: string
+          practice_session_id?: string
+          position?: number
+          grade?: number
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -194,6 +254,9 @@ export interface Database {
       }
     }
     Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
       [_ in never]: never
     }
   }

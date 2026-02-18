@@ -101,7 +101,7 @@ export function useGroupMembers(groupId: string | null) {
       .select('*, profile:profiles(*)')
       .eq('group_id', groupId)
       .then(({ data }) => {
-        setMembers((data ?? []) as GroupMember[])
+        setMembers((data ?? []) as unknown as GroupMember[])
         setLoading(false)
       })
   }, [groupId])

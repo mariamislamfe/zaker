@@ -40,7 +40,7 @@ export function useAnalytics(range: AnalyticsRange, referenceDate: Date = new Da
         .order('started_at', { ascending: true })
         .then(({ data }) => {
           if (cancelled) return
-          setSessions((data ?? []) as (Session & { subject: { name: string; color: string } })[])
+          setSessions((data ?? []) as unknown as (Session & { subject: { name: string; color: string } })[])
           setLoading(false)
         })
     }

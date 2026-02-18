@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select('*')
         .eq('id', userId)
         .single()
-      setProfile(data as Profile)
+      setProfile(data as Profile | null)
     } catch (err) {
       // Profile row might not exist right after signup — not fatal
       console.warn('fetchProfile:', err)
@@ -101,12 +101,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) throw new Error('Not authenticated')
     const { data, error } = await supabase
       .from('profiles')
-      .update(updates)
+      .update(updates as Record<string, unknown>)
       .eq('id', user.id)
       .select()
       .single()
     if (error) throw error
-    setProfile(data as Profile)
+    setProfile(data as Profile | null)
   }
 
   return (
