@@ -156,6 +156,21 @@ export interface DailyLog {
   created_at: string
 }
 
+// ─── Curriculum ────────────────────────────────────────────────────────────────
+
+export interface CurriculumItem {
+  id: string
+  user_id: string
+  subject_name: string
+  chapter: string | null
+  title: string
+  studied: boolean
+  reviewed: boolean
+  solved: boolean
+  order_index: number
+  created_at: string
+}
+
 export interface PracticePassage {
   id: string
   practice_session_id: string

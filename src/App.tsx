@@ -12,6 +12,7 @@ const SubjectsPage        = lazy(() => import('./pages/SubjectsPage').then(m => 
 const AnalyticsPage       = lazy(() => import('./pages/AnalyticsPage').then(m => ({ default: m.AnalyticsPage })))
 const SocialPage          = lazy(() => import('./pages/SocialPage').then(m => ({ default: m.SocialPage })))
 const PracticeTrackerPage = lazy(() => import('./pages/PracticeTrackerPage').then(m => ({ default: m.PracticeTrackerPage })))
+const CurriculumPage      = lazy(() => import('./pages/CurriculumPage').then(m => ({ default: m.CurriculumPage })))
 
 function PageLoader() {
   return (
@@ -57,6 +58,7 @@ function AppRoutes() {
           <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>} />
           <Route path="social" element={<Suspense fallback={<PageLoader />}><SocialPage /></Suspense>} />
           <Route path="urt" element={<Suspense fallback={<PageLoader />}><PracticeTrackerPage /></Suspense>} />
+          <Route path="curriculum" element={<Suspense fallback={<PageLoader />}><CurriculumPage /></Suspense>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
