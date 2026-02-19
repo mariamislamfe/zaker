@@ -171,6 +171,15 @@ export interface CurriculumItem {
   created_at: string
 }
 
+export interface URTSubject {
+  id: string
+  user_id: string
+  name: string
+  color: string
+  order_index: number
+  created_at: string
+}
+
 export interface PracticePassage {
   id: string
   practice_session_id: string
