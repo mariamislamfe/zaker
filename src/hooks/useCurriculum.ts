@@ -23,27 +23,42 @@ export function useCurriculum() {
 
   useEffect(() => { fetchItems() }, [fetchItems])
 
-  const addItem = useCallback(async (params: {
-    subject_name: string
-    chapter: string | null
-    title: string
-  }) => {
+  // Add a top-level Learning Objective (parent_id = null)
+  const addLO = useCallback(async (subjectId: string, title: string) => {
     if (!user) return null
-    const orderIndex = items.filter(i => i.subject_name === params.subject_name).length
+    const orderIndex = items.filter(i => i.subject_id === subjectId && i.parent_id === null).length
+    const { data, error } = await supabase
+      .from('curriculum_items')
+      .insert({ user_id: user.id, subject_id: subjectId, parent_id: null, title, order_index: orderIndex })
+      .select()
+      .single()
+    if (error || !data) return null
+    const newItem = data as CurriculumItem
+    setItems(prev => [...prev, newItem])
+    return newItem
+  }, [user, items])
+
+  // Add a lesson under an LO (parent_id = LO id)
+  const addLesson = useCallback(async (parentId: string, title: string) => {
+    if (!user) return null
+    const parentLO = items.find(i => i.id === parentId)
+    if (!parentLO) return null
+    const orderIndex = items.filter(i => i.parent_id === parentId).length
     const { data, error } = await supabase
       .from('curriculum_items')
       .insert({
         user_id: user.id,
-        subject_name: params.subject_name,
-        chapter: params.chapter || null,
-        title: params.title,
+        subject_id: parentLO.subject_id,
+        parent_id: parentId,
+        title,
         order_index: orderIndex,
       })
       .select()
       .single()
     if (error || !data) return null
-    setItems(prev => [...prev, data as CurriculumItem])
-    return data as CurriculumItem
+    const newItem = data as CurriculumItem
+    setItems(prev => [...prev, newItem])
+    return newItem
   }, [user, items])
 
   const toggleProgress = useCallback(async (
@@ -51,28 +66,29 @@ export function useCurriculum() {
     field: 'studied' | 'reviewed' | 'solved',
     value: boolean,
   ) => {
-    // Optimistic update — no need to wait for server
+    // Optimistic update
     setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i))
     await supabase.from('curriculum_items').update({ [field]: value }).eq('id', id)
   }, [])
 
   const deleteItem = useCallback(async (id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id))
+    // Optimistically remove the item and all its children (lessons of an LO)
+    setItems(prev => prev.filter(i => i.id !== id && i.parent_id !== id))
     await supabase.from('curriculum_items').delete().eq('id', id)
+    // DB CASCADE handles child deletion
   }, [])
 
-  // Unique subject names in insertion order
-  const subjectNames = useMemo(() => {
-    const seen = new Set<string>()
-    const result: string[] = []
+  // Lessons grouped by LO id
+  const lessonsByLO = useMemo(() => {
+    const map = new Map<string, CurriculumItem[]>()
     for (const item of items) {
-      if (!seen.has(item.subject_name)) {
-        seen.add(item.subject_name)
-        result.push(item.subject_name)
+      if (item.parent_id) {
+        if (!map.has(item.parent_id)) map.set(item.parent_id, [])
+        map.get(item.parent_id)!.push(item)
       }
     }
-    return result
+    return map
   }, [items])
 
-  return { items, loading, addItem, toggleProgress, deleteItem, subjectNames, refetch: fetchItems }
+  return { items, loading, addLO, addLesson, toggleProgress, deleteItem, lessonsByLO, refetch: fetchItems }
 }
