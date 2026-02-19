@@ -1,21 +1,23 @@
 import React, { useState, useMemo } from 'react'
-import { Plus, Trash2, Check, BookOpen } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Plus, Trash2, Check, BookOpen, ChevronRight } from 'lucide-react'
 import { useCurriculum } from '../hooks/useCurriculum'
+import { useSubjects } from '../hooks/useSubjects'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import type { CurriculumItem } from '../types'
+import type { CurriculumItem, Subject } from '../types'
 
 // ─── Checkbox cell ─────────────────────────────────────────────────────────────
 
 function CheckCell({
   checked,
-  label,
   color,
+  label,
   onChange,
 }: {
   checked: boolean
-  label: string
   color: string
+  label: string
   onChange: (v: boolean) => void
 }) {
   return (
@@ -25,11 +27,9 @@ function CheckCell({
         title={label}
         className={[
           'w-6 h-6 rounded-md border-2 flex items-center justify-center mx-auto transition-all',
-          checked
-            ? `border-transparent text-white`
-            : 'border-zinc-300 dark:border-zinc-600 hover:border-current',
+          checked ? 'text-white' : 'border-zinc-300 dark:border-zinc-600',
         ].join(' ')}
-        style={checked ? { backgroundColor: color, borderColor: color } : { color }}
+        style={checked ? { backgroundColor: color, borderColor: color } : { borderColor: undefined, color }}
       >
         {checked && <Check size={12} />}
       </button>
@@ -37,415 +37,458 @@ function CheckCell({
   )
 }
 
-// ─── Chapter table ──────────────────────────────────────────────────────────────
+// ─── LO Row (expandable) ────────────────────────────────────────────────────────
 
-function ChapterTable({
-  chapter,
-  items,
-  onToggle,
-  onDelete,
+function LORow({
+  lo,
+  lessons,
+  expanded,
+  subjectColor,
+  onToggleExpand,
+  onToggleProgress,
+  onDeleteItem,
+  onAddLesson,
 }: {
-  chapter: string
-  items: CurriculumItem[]
-  onToggle: (id: string, field: 'studied' | 'reviewed' | 'solved', v: boolean) => void
-  onDelete: (id: string) => void
+  lo: CurriculumItem
+  lessons: CurriculumItem[]
+  expanded: boolean
+  subjectColor: string
+  onToggleExpand: () => void
+  onToggleProgress: (id: string, field: 'studied' | 'reviewed' | 'solved', v: boolean) => void
+  onDeleteItem: (id: string) => void
+  onAddLesson: (title: string) => void
 }) {
-  const done = items.reduce(
-    (n, i) => n + (i.studied ? 1 : 0) + (i.reviewed ? 1 : 0) + (i.solved ? 1 : 0),
+  const [showAddLesson, setShowAddLesson] = useState(false)
+  const [lessonTitle, setLessonTitle] = useState('')
+
+  const doneTasks = lessons.reduce(
+    (n, l) => n + (l.studied ? 1 : 0) + (l.reviewed ? 1 : 0) + (l.solved ? 1 : 0),
     0,
   )
-  const total = items.length * 3
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  const totalTasks = lessons.length * 3
+  const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
 
-  return (
-    <Card padding="lg">
-      {/* Chapter header */}
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-          {chapter || 'General'}
-        </h3>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-zinc-500">
-            {done}/{total} ({pct}%)
-          </span>
-          <div className="w-20 h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-100 dark:border-zinc-800">
-              <th className="text-left py-2 pr-3 text-xs font-medium text-zinc-400 w-6">#</th>
-              <th className="text-left py-2 pr-4 text-xs font-medium text-zinc-400">Title / LO</th>
-              <th className="py-2 px-2 text-xs font-medium text-zinc-400 whitespace-nowrap">
-                <span className="text-blue-500">Studied</span>
-              </th>
-              <th className="py-2 px-2 text-xs font-medium text-zinc-400 whitespace-nowrap">
-                <span className="text-amber-500">Reviewed</span>
-              </th>
-              <th className="py-2 px-2 text-xs font-medium text-zinc-400 whitespace-nowrap">
-                <span className="text-emerald-500">Solved</span>
-              </th>
-              <th className="py-2 px-2 text-xs font-medium text-zinc-400">%</th>
-              <th className="py-2 pl-2 w-8" />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, idx) => {
-              const itemDone =
-                (item.studied ? 1 : 0) + (item.reviewed ? 1 : 0) + (item.solved ? 1 : 0)
-              const itemPct = Math.round((itemDone / 3) * 100)
-              return (
-                <tr
-                  key={item.id}
-                  className="border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
-                >
-                  <td className="py-2.5 pr-3 text-zinc-400 text-xs">{idx + 1}</td>
-                  <td className="py-2.5 pr-4 font-medium text-zinc-800 dark:text-zinc-200">
-                    {item.title}
-                  </td>
-                  <CheckCell
-                    checked={item.studied}
-                    label="Studied"
-                    color="#3b82f6"
-                    onChange={v => onToggle(item.id, 'studied', v)}
-                  />
-                  <CheckCell
-                    checked={item.reviewed}
-                    label="Reviewed"
-                    color="#f59e0b"
-                    onChange={v => onToggle(item.id, 'reviewed', v)}
-                  />
-                  <CheckCell
-                    checked={item.solved}
-                    label="Solved"
-                    color="#10b981"
-                    onChange={v => onToggle(item.id, 'solved', v)}
-                  />
-                  <td className="py-2.5 px-2 text-center">
-                    <span
-                      className={[
-                        'text-xs font-bold',
-                        itemPct === 100
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : itemPct > 0
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-zinc-400',
-                      ].join(' ')}
-                    >
-                      {itemPct}%
-                    </span>
-                  </td>
-                  <td className="py-2.5 pl-2">
-                    <button
-                      onClick={() => onDelete(item.id)}
-                      className="p-1 rounded text-zinc-300 dark:text-zinc-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  )
-}
-
-// ─── Add Item Form ──────────────────────────────────────────────────────────────
-
-function AddItemForm({
-  defaultSubject,
-  subjectNames,
-  onAdd,
-  onCancel,
-}: {
-  defaultSubject: string
-  subjectNames: string[]
-  onAdd: (subject: string, chapter: string | null, title: string) => Promise<void>
-  onCancel: () => void
-}) {
-  const [subject, setSubject] = useState(defaultSubject)
-  const [chapter, setChapter] = useState('')
-  const [title, setTitle] = useState('')
-  const [adding, setAdding] = useState(false)
-
-  const canAdd = subject.trim().length > 0 && title.trim().length > 0
-
-  async function handleAdd() {
-    if (!canAdd) return
-    setAdding(true)
-    await onAdd(subject.trim(), chapter.trim() || null, title.trim())
-    setTitle('')
-    setChapter('')
-    setAdding(false)
+  function handleAddLesson() {
+    const t = lessonTitle.trim()
+    if (!t) return
+    onAddLesson(t)
+    setLessonTitle('')
+    setShowAddLesson(false)
   }
 
   return (
-    <Card padding="lg">
-      <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
-        Add Curriculum Item
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1 block">
-            Subject <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="text"
-            value={subject}
-            onChange={e => setSubject(e.target.value)}
-            placeholder="e.g. Math"
-            list="curr-subject-suggestions"
-            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-          <datalist id="curr-subject-suggestions">
-            {subjectNames.map(n => (
-              <option key={n} value={n} />
-            ))}
-          </datalist>
-        </div>
-        <div>
-          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1 block">
-            Chapter <span className="text-zinc-400">(optional)</span>
-          </label>
-          <input
-            type="text"
-            value={chapter}
-            onChange={e => setChapter(e.target.value)}
-            placeholder="e.g. Chapter 3"
-            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1 block">
-            Title / LO <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Newton's 2nd Law"
-            onKeyDown={e => e.key === 'Enter' && handleAdd()}
-            className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
-        </div>
+    <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+      {/* LO header */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-zinc-900 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/60 transition-colors select-none"
+        onClick={onToggleExpand}
+      >
+        <ChevronRight
+          size={16}
+          className={`text-zinc-400 transition-transform duration-200 shrink-0 ${expanded ? 'rotate-90' : ''}`}
+        />
+        <span className="flex-1 font-medium text-zinc-800 dark:text-zinc-200 text-sm">
+          {lo.title}
+        </span>
+        <span className="text-xs text-zinc-400 mr-1">
+          {lessons.length} {lessons.length === 1 ? 'lesson' : 'lessons'}
+        </span>
+        {totalTasks > 0 && (
+          <span
+            className={[
+              'text-xs font-semibold px-2 py-0.5 rounded-full',
+              pct === 100
+                ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                : pct > 0
+                ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
+            ].join(' ')}
+          >
+            {pct}%
+          </span>
+        )}
+        <button
+          onClick={e => { e.stopPropagation(); onDeleteItem(lo.id) }}
+          className="p-1 ml-1 rounded text-zinc-300 dark:text-zinc-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
-      <div className="flex gap-2 mt-4">
-        <Button onClick={handleAdd} loading={adding} disabled={!canAdd}>
-          Add
-        </Button>
-        <Button variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
+
+      {/* Expanded panel */}
+      {expanded && (
+        <div className="border-t border-zinc-100 dark:border-zinc-800">
+          {/* Lessons table */}
+          {lessons.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-800/40">
+                    <th className="text-left px-4 py-2 text-xs font-medium text-zinc-400 w-8">#</th>
+                    <th className="text-left px-2 py-2 text-xs font-medium text-zinc-400">Lesson</th>
+                    <th className="px-2 py-2 text-xs font-semibold text-blue-500">Studied</th>
+                    <th className="px-2 py-2 text-xs font-semibold text-amber-500">Reviewed</th>
+                    <th className="px-2 py-2 text-xs font-semibold text-emerald-500">Solved</th>
+                    <th className="px-2 py-2 text-xs font-medium text-zinc-400">%</th>
+                    <th className="px-2 py-2 w-8" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {lessons.map((lesson, idx) => {
+                    const done =
+                      (lesson.studied ? 1 : 0) +
+                      (lesson.reviewed ? 1 : 0) +
+                      (lesson.solved ? 1 : 0)
+                    return (
+                      <tr
+                        key={lesson.id}
+                        className="border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
+                      >
+                        <td className="px-4 py-2.5 text-zinc-400 text-xs">{idx + 1}</td>
+                        <td className="px-2 py-2.5 text-zinc-800 dark:text-zinc-200">
+                          {lesson.title}
+                        </td>
+                        <CheckCell
+                          checked={lesson.studied}
+                          color="#3b82f6"
+                          label="Studied"
+                          onChange={v => onToggleProgress(lesson.id, 'studied', v)}
+                        />
+                        <CheckCell
+                          checked={lesson.reviewed}
+                          color="#f59e0b"
+                          label="Reviewed"
+                          onChange={v => onToggleProgress(lesson.id, 'reviewed', v)}
+                        />
+                        <CheckCell
+                          checked={lesson.solved}
+                          color="#10b981"
+                          label="Solved"
+                          onChange={v => onToggleProgress(lesson.id, 'solved', v)}
+                        />
+                        <td className="px-2 py-2.5 text-center">
+                          <span
+                            className={[
+                              'text-xs font-bold',
+                              done === 3
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : done > 0
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-zinc-400',
+                            ].join(' ')}
+                          >
+                            {Math.round((done / 3) * 100)}%
+                          </span>
+                        </td>
+                        <td className="px-2 py-2.5">
+                          <button
+                            onClick={() => onDeleteItem(lesson.id)}
+                            className="p-1 rounded text-zinc-300 dark:text-zinc-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Add lesson */}
+          <div className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-800/20">
+            {showAddLesson ? (
+              <div className="flex gap-2">
+                <input
+                  autoFocus
+                  type="text"
+                  value={lessonTitle}
+                  onChange={e => setLessonTitle(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddLesson()
+                    if (e.key === 'Escape') setShowAddLesson(false)
+                  }}
+                  placeholder="Lesson title…"
+                  className="flex-1 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <Button size="sm" onClick={handleAddLesson} disabled={!lessonTitle.trim()}>
+                  Add
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => setShowAddLesson(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <button
+                onClick={e => { e.stopPropagation(); setShowAddLesson(true) }}
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              >
+                <Plus size={14} />
+                Add lesson
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Subject Panel ──────────────────────────────────────────────────────────────
+
+function SubjectPanel({
+  subject,
+  items,
+  lessonsByLO,
+  onAddLO,
+  onAddLesson,
+  onToggleProgress,
+  onDeleteItem,
+}: {
+  subject: Subject
+  items: CurriculumItem[]
+  lessonsByLO: Map<string, CurriculumItem[]>
+  onAddLO: (subjectId: string, title: string) => Promise<CurriculumItem | null>
+  onAddLesson: (parentId: string, title: string) => void
+  onToggleProgress: (id: string, field: 'studied' | 'reviewed' | 'solved', v: boolean) => void
+  onDeleteItem: (id: string) => void
+}) {
+  const [expandedLOs, setExpandedLOs] = useState<Set<string>>(new Set())
+  const [showAddLO, setShowAddLO] = useState(false)
+  const [newLOTitle, setNewLOTitle] = useState('')
+  const [addingLO, setAddingLO] = useState(false)
+
+  const los = items.filter(i => i.subject_id === subject.id && i.parent_id === null)
+
+  const allLessons = useMemo(
+    () => items.filter(i => i.subject_id === subject.id && i.parent_id !== null),
+    [items, subject.id],
+  )
+  const doneTasks = allLessons.reduce(
+    (n, l) => n + (l.studied ? 1 : 0) + (l.reviewed ? 1 : 0) + (l.solved ? 1 : 0),
+    0,
+  )
+  const totalTasks = allLessons.length * 3
+  const overallPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+
+  function toggleLO(id: string) {
+    setExpandedLOs(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleAddLO() {
+    const t = newLOTitle.trim()
+    if (!t) return
+    setAddingLO(true)
+    const newLO = await onAddLO(subject.id, t)
+    if (newLO) setExpandedLOs(prev => new Set([...prev, newLO.id]))
+    setNewLOTitle('')
+    setShowAddLO(false)
+    setAddingLO(false)
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Overall progress */}
+      {allLessons.length > 0 && (
+        <Card padding="lg">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{subject.icon}</span>
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">{subject.name}</span>
+            </div>
+            <span className="text-sm text-zinc-500">
+              {los.length} LOs · {allLessons.length} lessons · {overallPct}%
+            </span>
+          </div>
+          <div className="h-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${overallPct}%`, backgroundColor: subject.color }}
+            />
+          </div>
+          <div className="flex gap-4 mt-2.5 text-xs text-zinc-500">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" /> Studied
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" /> Reviewed
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> Solved
+            </span>
+          </div>
+        </Card>
+      )}
+
+      {/* LO list */}
+      <div className="space-y-2">
+        {los.map(lo => (
+          <LORow
+            key={lo.id}
+            lo={lo}
+            lessons={lessonsByLO.get(lo.id) ?? []}
+            expanded={expandedLOs.has(lo.id)}
+            subjectColor={subject.color}
+            onToggleExpand={() => toggleLO(lo.id)}
+            onToggleProgress={onToggleProgress}
+            onDeleteItem={onDeleteItem}
+            onAddLesson={title => onAddLesson(lo.id, title)}
+          />
+        ))}
+
+        {los.length === 0 && (
+          <div className="py-6 text-center text-sm text-zinc-400 dark:text-zinc-500">
+            No LOs yet — add your first learning objective below.
+          </div>
+        )}
       </div>
-    </Card>
+
+      {/* Add LO */}
+      {showAddLO ? (
+        <div className="flex gap-2">
+          <input
+            autoFocus
+            type="text"
+            value={newLOTitle}
+            onChange={e => setNewLOTitle(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleAddLO()
+              if (e.key === 'Escape') setShowAddLO(false)
+            }}
+            placeholder="LO title (e.g. Derivatives)"
+            className="flex-1 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <Button onClick={handleAddLO} loading={addingLO} disabled={!newLOTitle.trim()}>
+            Add LO
+          </Button>
+          <Button variant="secondary" onClick={() => setShowAddLO(false)}>
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <Button
+          variant="secondary"
+          icon={<Plus size={16} />}
+          onClick={() => setShowAddLO(true)}
+        >
+          Add LO
+        </Button>
+      )}
+    </div>
   )
 }
 
 // ─── Main Page ──────────────────────────────────────────────────────────────────
 
 export function CurriculumPage() {
-  const { items, loading, addItem, toggleProgress, deleteItem, subjectNames } = useCurriculum()
-  const [activeSubject, setActiveSubject] = useState<string | null>(null)
-  const [showAddForm, setShowAddForm] = useState(false)
+  const { subjects, loading: subjectsLoading } = useSubjects()
+  const { items, loading: itemsLoading, addLO, addLesson, toggleProgress, deleteItem, lessonsByLO } = useCurriculum()
+  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null)
 
-  // Default to first available subject
-  const currentSubject = activeSubject ?? subjectNames[0] ?? null
+  const activeSubjects = subjects.filter(s => s.is_active)
+  const currentSubjectId = activeSubjectId ?? activeSubjects[0]?.id ?? null
+  const currentSubject = activeSubjects.find(s => s.id === currentSubjectId) ?? null
 
-  // Items for the active subject
-  const subjectItems = items.filter(i => i.subject_name === currentSubject)
-
-  // Group by chapter (null → '')
-  const chapters = useMemo(() => {
-    const map = new Map<string, CurriculumItem[]>()
-    for (const item of subjectItems) {
-      const key = item.chapter ?? ''
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(item)
-    }
-    return map
-  }, [subjectItems])
-
-  // Overall progress for current subject
-  const totalTasks = subjectItems.length * 3
-  const doneTasks = subjectItems.reduce(
-    (n, i) => n + (i.studied ? 1 : 0) + (i.reviewed ? 1 : 0) + (i.solved ? 1 : 0),
-    0,
-  )
-  const overallPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
-
-  async function handleAdd(subject: string, chapter: string | null, title: string) {
-    const newItem = await addItem({ subject_name: subject, chapter, title })
-    if (newItem && subject !== currentSubject) {
-      setActiveSubject(subject)
-    }
-    setShowAddForm(false)
-  }
+  const loading = subjectsLoading || itemsLoading
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Curriculum</h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Track your LOs and chapters with studied · reviewed · solved
-          </p>
-        </div>
-        <Button icon={<Plus size={16} />} onClick={() => setShowAddForm(v => !v)}>
-          Add Item
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Curriculum</h1>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          Track LOs and lessons per subject — studied · reviewed · solved
+        </p>
       </div>
 
-      {/* Subject Tabs */}
-      {subjectNames.length > 0 && (
+      {/* No active subjects */}
+      {!loading && activeSubjects.length === 0 && (
+        <Card padding="lg">
+          <div className="py-12 text-center">
+            <BookOpen size={40} className="mx-auto text-zinc-300 dark:text-zinc-700 mb-4" />
+            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              No active subjects found
+            </p>
+            <p className="text-xs text-zinc-400 mt-1">
+              Add subjects first from the{' '}
+              <Link to="/subjects" className="text-primary-600 dark:text-primary-400 hover:underline">
+                Subjects page
+              </Link>
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Subject tabs */}
+      {activeSubjects.length > 0 && (
         <div className="flex gap-2 flex-wrap">
-          {subjectNames.map(name => {
-            const sItems = items.filter(i => i.subject_name === name)
-            const sDone = sItems.reduce(
-              (n, i) => n + (i.studied ? 1 : 0) + (i.reviewed ? 1 : 0) + (i.solved ? 1 : 0),
+          {activeSubjects.map(subject => {
+            const lessons = items.filter(i => i.subject_id === subject.id && i.parent_id !== null)
+            const done = lessons.reduce(
+              (n, l) => n + (l.studied ? 1 : 0) + (l.reviewed ? 1 : 0) + (l.solved ? 1 : 0),
               0,
             )
-            const sTotal = sItems.length * 3
-            const sPct = sTotal > 0 ? Math.round((sDone / sTotal) * 100) : 0
-            const isActive = currentSubject === name
+            const total = lessons.length * 3
+            const pct = total > 0 ? Math.round((done / total) * 100) : null
+            const isActive = currentSubjectId === subject.id
+
             return (
               <button
-                key={name}
-                onClick={() => setActiveSubject(name)}
+                key={subject.id}
+                onClick={() => setActiveSubjectId(subject.id)}
                 className={[
                   'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all',
                   isActive
-                    ? 'bg-primary-600 text-white border-primary-600'
-                    : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-primary-400 dark:hover:border-primary-600',
+                    ? 'text-white border-transparent shadow-sm'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500',
                 ].join(' ')}
+                style={isActive ? { backgroundColor: subject.color, borderColor: subject.color } : {}}
               >
-                {name}
-                <span
-                  className={[
-                    'text-xs px-1.5 py-0.5 rounded-full font-semibold',
-                    isActive
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400',
-                  ].join(' ')}
-                >
-                  {sPct}%
-                </span>
+                <span className="text-base leading-none">{subject.icon}</span>
+                {subject.name}
+                {pct !== null && (
+                  <span
+                    className={[
+                      'text-xs font-semibold px-1.5 py-0.5 rounded-full',
+                      isActive
+                        ? 'bg-white/25 text-white'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
+                    ].join(' ')}
+                  >
+                    {pct}%
+                  </span>
+                )}
               </button>
             )
           })}
         </div>
       )}
 
-      {/* Add form */}
-      {showAddForm && (
-        <AddItemForm
-          defaultSubject={currentSubject ?? ''}
-          subjectNames={subjectNames}
-          onAdd={handleAdd}
-          onCancel={() => setShowAddForm(false)}
+      {/* Active subject panel */}
+      {currentSubject && !loading && (
+        <SubjectPanel
+          key={currentSubject.id}
+          subject={currentSubject}
+          items={items}
+          lessonsByLO={lessonsByLO}
+          onAddLO={addLO}
+          onAddLesson={addLesson}
+          onToggleProgress={toggleProgress}
+          onDeleteItem={deleteItem}
         />
-      )}
-
-      {/* Empty state */}
-      {!loading && subjectNames.length === 0 && !showAddForm && (
-        <Card padding="lg">
-          <div className="py-12 text-center">
-            <BookOpen size={40} className="mx-auto text-zinc-300 dark:text-zinc-700 mb-4" />
-            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              No curriculum items yet
-            </p>
-            <p className="text-xs text-zinc-400 mt-1">
-              Add subjects and chapters to track your study progress
-            </p>
-            <Button
-              className="mt-4"
-              icon={<Plus size={16} />}
-              onClick={() => setShowAddForm(true)}
-            >
-              Add First Item
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Subject content */}
-      {currentSubject && subjectItems.length > 0 && (
-        <div className="space-y-4">
-          {/* Overall progress bar */}
-          <Card padding="lg">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">{currentSubject}</h2>
-              <span className="text-sm text-zinc-500">
-                {doneTasks}/{totalTasks} tasks · {overallPct}%
-              </span>
-            </div>
-            <div className="h-3 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary-500 transition-all duration-500"
-                style={{ width: `${overallPct}%` }}
-              />
-            </div>
-            {/* Legend */}
-            <div className="flex gap-4 mt-3 text-xs text-zinc-500">
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" /> Studied
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block" /> Reviewed
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> Solved
-              </span>
-            </div>
-          </Card>
-
-          {/* Chapter tables */}
-          {[...chapters.entries()].map(([chapter, chItems]) => (
-            <ChapterTable
-              key={chapter}
-              chapter={chapter}
-              items={chItems}
-              onToggle={toggleProgress}
-              onDelete={deleteItem}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Subject exists but empty (all items deleted) */}
-      {currentSubject && subjectItems.length === 0 && !loading && subjectNames.length > 0 && !showAddForm && (
-        <Card padding="lg">
-          <div className="py-8 text-center">
-            <p className="text-sm text-zinc-400">No items in {currentSubject} yet.</p>
-            <Button
-              className="mt-3"
-              size="sm"
-              variant="secondary"
-              icon={<Plus size={14} />}
-              onClick={() => setShowAddForm(true)}
-            >
-              Add Item
-            </Button>
-          </div>
-        </Card>
       )}
 
       {/* Loading skeleton */}
       {loading && (
-        <div className="space-y-4">
-          {[1, 2].map(i => (
-            <div key={i} className="h-40 rounded-xl bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-14 rounded-xl bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
           ))}
         </div>
       )}

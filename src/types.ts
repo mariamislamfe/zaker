@@ -161,8 +161,8 @@ export interface DailyLog {
 export interface CurriculumItem {
   id: string
   user_id: string
-  subject_name: string
-  chapter: string | null
+  subject_id: string
+  parent_id: string | null   // null = LO, set = Lesson under an LO
   title: string
   studied: boolean
   reviewed: boolean
