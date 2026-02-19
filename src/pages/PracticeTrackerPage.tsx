@@ -1,9 +1,25 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Timer, Watch, Play, Pause, Square, RotateCcw, BookOpen } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  Timer, Watch, Play, Pause, Square, RotateCcw, BookOpen, Pencil,
+  TrendingUp, BarChart2, ChevronDown, ChevronUp,
+} from 'lucide-react'
 import { usePractice } from '../hooks/usePractice'
 import { Card } from '../components/ui/Card'
-import { formatHumanDuration } from '../utils/time'
 import type { PracticeMode, PracticeSession } from '../types'
+
+// ─── URT Fixed Subjects ────────────────────────────────────────────────────────
+
+const URT_SUBJECTS = [
+  { id: 'Math',      name: 'Math',      color: '#3b82f6' },
+  { id: 'Mechanics', name: 'Mechanics', color: '#f59e0b' },
+  { id: 'English',   name: 'English',   color: '#10b981' },
+  { id: 'Physics',   name: 'Physics',   color: '#8b5cf6' },
+  { id: 'Chemistry', name: 'Chemistry', color: '#ef4444' },
+]
+
+function subjectColor(name: string | null): string {
+  return URT_SUBJECTS.find(s => s.id === name)?.color ?? '#6366f1'
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -15,21 +31,25 @@ function fmt(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-// ─── Passages Modal ────────────────────────────────────────────────────────────
+interface PassageScore { correct: string; total: string }
 
-interface PassageScore {
-  correct: string
-  total: string
-}
+// ─── Passages Modal (new + edit) ──────────────────────────────────────────────
 
 interface PassagesModalProps {
+  title?: string
+  initialGrades?: number[]   // pre-filled when editing
   onSave: (grades: number[]) => void
-  onSkip: () => void
+  onSkip?: () => void
+  onCancel?: () => void
 }
 
-function PassagesModal({ onSave, onSkip }: PassagesModalProps) {
-  const [count, setCount] = useState(1)
-  const [scores, setScores] = useState<PassageScore[]>([{ correct: '', total: '' }])
+function PassagesModal({ title = 'Session Complete!', initialGrades, onSave, onSkip, onCancel }: PassagesModalProps) {
+  const initial: PassageScore[] = initialGrades && initialGrades.length > 0
+    ? initialGrades.map(g => ({ correct: String(g), total: '100' }))
+    : [{ correct: '', total: '' }]
+
+  const [count, setCount] = useState(initial.length)
+  const [scores, setScores] = useState<PassageScore[]>(initial)
 
   function changeCount(delta: number) {
     const next = Math.max(1, Math.min(20, count + delta))
@@ -42,14 +62,9 @@ function PassagesModal({ onSave, onSkip }: PassagesModalProps) {
   }
 
   function setField(i: number, field: 'correct' | 'total', val: string) {
-    setScores(prev => {
-      const arr = [...prev]
-      arr[i] = { ...arr[i], [field]: val }
-      return arr
-    })
+    setScores(prev => { const arr = [...prev]; arr[i] = { ...arr[i], [field]: val }; return arr })
   }
 
-  // Calculate percentage grade per passage: correct / total * 100
   const percentages = scores.map(({ correct, total }) => {
     const c = parseInt(correct, 10)
     const t = parseInt(total, 10)
@@ -58,24 +73,17 @@ function PassagesModal({ onSave, onSkip }: PassagesModalProps) {
   })
 
   const filled = percentages.filter((g): g is number => g !== null)
-  const avg = filled.length > 0
-    ? Math.round(filled.reduce((s, g) => s + g, 0) / filled.length)
-    : null
-
-  function handleSave() {
-    onSave(filled)
-  }
+  const avg = filled.length > 0 ? Math.round(filled.reduce((s, g) => s + g, 0) / filled.length) : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-        {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-zinc-100 dark:border-zinc-800">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📝</span>
             <div>
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Session Complete!</h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">How did your URT practice go?</p>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{title}</h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Enter passage scores (correct / total)</p>
             </div>
           </div>
         </div>
@@ -83,34 +91,18 @@ function PassagesModal({ onSave, onSkip }: PassagesModalProps) {
         <div className="px-6 py-5 space-y-5">
           {/* Passage count */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-              Number of passages
-            </label>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Number of passages</label>
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => changeCount(-1)}
-                className="w-9 h-9 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              >
-                −
-              </button>
-              <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 w-8 text-center">
-                {count}
-              </span>
-              <button
-                onClick={() => changeCount(1)}
-                className="w-9 h-9 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              >
-                +
-              </button>
+              <button onClick={() => changeCount(-1)} className="w-9 h-9 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">−</button>
+              <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 w-8 text-center">{count}</span>
+              <button onClick={() => changeCount(1)} className="w-9 h-9 rounded-lg border border-zinc-200 dark:border-zinc-700 flex items-center justify-center text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">+</button>
             </div>
           </div>
 
-          {/* Score inputs — correct out of total */}
+          {/* Score inputs */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Score per passage
-              </label>
+              <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Score per passage</label>
               <span className="text-xs text-zinc-400">(correct / total)</span>
             </div>
             <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
@@ -118,33 +110,12 @@ function PassagesModal({ onSave, onSkip }: PassagesModalProps) {
                 const pct = percentages[i]
                 return (
                   <div key={i} className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-400 w-16 shrink-0">
-                      Passage {i + 1}
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={s.correct}
-                      onChange={e => setField(i, 'correct', e.target.value)}
-                      placeholder="correct"
-                      className="w-20 px-2 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 text-center focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
+                    <span className="text-xs text-zinc-400 w-16 shrink-0">Passage {i + 1}</span>
+                    <input type="number" min={0} value={s.correct} onChange={e => setField(i, 'correct', e.target.value)} placeholder="correct" className="w-20 px-2 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 text-center focus:outline-none focus:ring-2 focus:ring-primary-500" />
                     <span className="text-zinc-400 font-medium">/</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={s.total}
-                      onChange={e => setField(i, 'total', e.target.value)}
-                      placeholder="total"
-                      className="w-20 px-2 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 text-center focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
+                    <input type="number" min={1} value={s.total} onChange={e => setField(i, 'total', e.target.value)} placeholder="total" className="w-20 px-2 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 text-center focus:outline-none focus:ring-2 focus:ring-primary-500" />
                     {pct !== null && (
-                      <span className={[
-                        'text-xs font-semibold w-10 text-right shrink-0',
-                        pct >= 80 ? 'text-emerald-600 dark:text-emerald-400'
-                          : pct >= 60 ? 'text-amber-500'
-                            : 'text-red-500',
-                      ].join(' ')}>
+                      <span className={['text-xs font-semibold w-10 text-right shrink-0', pct >= 80 ? 'text-emerald-600 dark:text-emerald-400' : pct >= 60 ? 'text-amber-500' : 'text-red-500'].join(' ')}>
                         {pct}%
                       </span>
                     )}
@@ -158,31 +129,26 @@ function PassagesModal({ onSave, onSkip }: PassagesModalProps) {
           {avg !== null && (
             <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-primary-50 dark:bg-primary-950 border border-primary-100 dark:border-primary-900">
               <span className="text-sm font-medium text-primary-700 dark:text-primary-300">Average Score</span>
-              <span className={[
-                'text-2xl font-bold',
-                avg >= 80 ? 'text-emerald-600 dark:text-emerald-400'
-                  : avg >= 60 ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-red-600 dark:text-red-400',
-              ].join(' ')}>
+              <span className={['text-2xl font-bold', avg >= 80 ? 'text-emerald-600 dark:text-emerald-400' : avg >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'].join(' ')}>
                 {avg}%
               </span>
             </div>
           )}
         </div>
 
-        {/* Actions */}
         <div className="px-6 pb-6 flex gap-3">
-          <button
-            onClick={onSkip}
-            className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-          >
-            Skip
-          </button>
-          <button
-            onClick={handleSave}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold transition-colors"
-          >
-            Save Session
+          {onCancel && (
+            <button onClick={onCancel} className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+              Cancel
+            </button>
+          )}
+          {onSkip && (
+            <button onClick={onSkip} className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+              Skip
+            </button>
+          )}
+          <button onClick={() => onSave(filled)} className="flex-1 px-4 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-bold transition-colors">
+            Save
           </button>
         </div>
       </div>
@@ -190,46 +156,236 @@ function PassagesModal({ onSave, onSkip }: PassagesModalProps) {
   )
 }
 
+// ─── Edit Session Modal ────────────────────────────────────────────────────────
+
+function EditSessionModal({ session, getPassages, onUpdate, onClose }: {
+  session: PracticeSession
+  getPassages: (id: string) => Promise<number[]>
+  onUpdate: (id: string, grades: number[]) => Promise<void>
+  onClose: () => void
+}) {
+  const [grades, setGrades] = useState<number[] | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    getPassages(session.id).then(setGrades)
+  }, [session.id, getPassages])
+
+  async function handleSave(newGrades: number[]) {
+    setSaving(true)
+    await onUpdate(session.id, newGrades)
+    setSaving(false)
+    onClose()
+  }
+
+  if (grades === null) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-8">
+          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <PassagesModal
+      title={`Edit — ${session.subject ?? 'URT'} session`}
+      initialGrades={grades}
+      onSave={saving ? () => {} : handleSave}
+      onCancel={onClose}
+    />
+  )
+}
+
 // ─── History Row ──────────────────────────────────────────────────────────────
 
-function HistoryRow({ session }: { session: PracticeSession }) {
+function HistoryRow({ session, onEdit }: { session: PracticeSession; onEdit: () => void }) {
   const date = new Date(session.created_at)
   const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  const color = subjectColor(session.subject)
 
   return (
     <div className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
       <div className="flex items-center gap-3">
         <span className="text-lg">{session.mode === 'stopwatch' ? '⏱️' : '⏳'}</span>
         <div>
-          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
             {session.mode === 'stopwatch' ? 'Stopwatch' : 'Timer'} · {fmt(session.actual_seconds)}
+            {session.subject && (
+              <span className="px-1.5 py-0.5 rounded text-xs font-semibold" style={{ backgroundColor: color + '22', color }}>
+                {session.subject}
+              </span>
+            )}
           </p>
           <p className="text-xs text-zinc-400">{dateStr} at {timeStr}</p>
         </div>
       </div>
-      <div className="text-right">
-        {session.passage_count > 0 ? (
-          <>
-            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-              {session.passage_count} passage{session.passage_count !== 1 ? 's' : ''}
-            </p>
-            {session.average_grade !== null && (
-              <p className={[
-                'text-xs font-medium',
-                session.average_grade >= 80 ? 'text-emerald-600 dark:text-emerald-400'
-                  : session.average_grade >= 60 ? 'text-amber-500'
-                    : 'text-red-500',
-              ].join(' ')}>
-                avg {session.average_grade}%
+      <div className="flex items-center gap-2">
+        <div className="text-right">
+          {session.passage_count > 0 ? (
+            <>
+              <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                {session.passage_count} passage{session.passage_count !== 1 ? 's' : ''}
               </p>
-            )}
-          </>
-        ) : (
-          <p className="text-xs text-zinc-400">No passages</p>
-        )}
+              {session.average_grade !== null && (
+                <p className={['text-xs font-medium', session.average_grade >= 80 ? 'text-emerald-600 dark:text-emerald-400' : session.average_grade >= 60 ? 'text-amber-500' : 'text-red-500'].join(' ')}>
+                  avg {session.average_grade}%
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-zinc-400">No passages</p>
+          )}
+        </div>
+        <button
+          onClick={onEdit}
+          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+          title="Edit session"
+        >
+          <Pencil size={14} />
+        </button>
       </div>
     </div>
+  )
+}
+
+// ─── URT Analytics Section ─────────────────────────────────────────────────────
+
+function UrtAnalytics({ sessions }: { sessions: PracticeSession[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  // Per-subject aggregate stats
+  const subjectStats = URT_SUBJECTS.map(subj => {
+    const sub = sessions.filter(s => s.subject === subj.id && s.average_grade !== null)
+    const allSessions = sessions.filter(s => s.subject === subj.id)
+    if (allSessions.length === 0) return null
+    const grades = sub.map(s => s.average_grade as number)
+    const avg = grades.length > 0 ? Math.round(grades.reduce((a, b) => a + b, 0) / grades.length) : null
+
+    // Trend: compare last 3 vs previous 3
+    let trend: 'up' | 'down' | 'flat' = 'flat'
+    if (grades.length >= 2) {
+      const half = Math.ceil(grades.length / 2)
+      const recent = grades.slice(-half)
+      const older = grades.slice(0, -half)
+      const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length
+      const olderAvg = older.reduce((a, b) => a + b, 0) / older.length
+      if (recentAvg > olderAvg + 2) trend = 'up'
+      else if (recentAvg < olderAvg - 2) trend = 'down'
+    }
+
+    return { ...subj, avg, trend, sessionCount: allSessions.length, gradedCount: sub.length }
+  }).filter(Boolean) as (typeof URT_SUBJECTS[0] & { avg: number | null; trend: 'up' | 'down' | 'flat'; sessionCount: number; gradedCount: number })[]
+
+  const active = subjectStats.filter(s => s.sessionCount > 0)
+
+  if (active.length === 0) return null
+
+  // Last 10 graded sessions for trend chart
+  const last10 = sessions.filter(s => s.average_grade !== null).slice(0, 10).reverse()
+
+  return (
+    <Card padding="lg">
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between"
+      >
+        <div className="flex items-center gap-2">
+          <BarChart2 size={16} className="text-primary-500" />
+          <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">URT Analytics</h2>
+          <span className="text-xs text-zinc-400">({sessions.length} session{sessions.length !== 1 ? 's' : ''})</span>
+        </div>
+        {expanded ? <ChevronUp size={16} className="text-zinc-400" /> : <ChevronDown size={16} className="text-zinc-400" />}
+      </button>
+
+      {expanded && (
+        <div className="mt-5 space-y-5">
+          {/* Per-subject performance cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {URT_SUBJECTS.map(subj => {
+              const stat = active.find(s => s.id === subj.id)
+              return (
+                <div
+                  key={subj.id}
+                  className="rounded-xl p-3 border-2"
+                  style={{ borderColor: subj.color + '44', backgroundColor: subj.color + '11' }}
+                >
+                  <p className="text-xs font-bold mb-1" style={{ color: subj.color }}>{subj.name}</p>
+                  {stat ? (
+                    <>
+                      <p className={['text-xl font-bold', stat.avg !== null && stat.avg >= 80 ? 'text-emerald-600' : stat.avg !== null && stat.avg >= 60 ? 'text-amber-500' : 'text-red-500'].join(' ')}>
+                        {stat.avg !== null ? `${stat.avg}%` : '—'}
+                      </p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <span className="text-xs text-zinc-400">{stat.sessionCount} sessions</span>
+                        {stat.trend === 'up' && <TrendingUp size={11} className="text-emerald-500" />}
+                        {stat.trend === 'down' && <TrendingUp size={11} className="text-red-500 rotate-180" />}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-zinc-400 mt-1">No data</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Average grade bars per subject */}
+          {active.filter(s => s.avg !== null).length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                Average Grade by Subject
+              </p>
+              <div className="space-y-3">
+                {active.filter(s => s.avg !== null).sort((a, b) => (b.avg ?? 0) - (a.avg ?? 0)).map(s => (
+                  <div key={s.id}>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{s.name}</span>
+                      <span className={['text-sm font-bold', (s.avg ?? 0) >= 80 ? 'text-emerald-600' : (s.avg ?? 0) >= 60 ? 'text-amber-500' : 'text-red-500'].join(' ')}>
+                        {s.avg}%
+                      </span>
+                    </div>
+                    <div className="h-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s.avg}%`, backgroundColor: s.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Grade trend — last 10 sessions */}
+          {last10.length >= 2 && (
+            <div>
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
+                Grade Trend (last {last10.length} graded sessions)
+              </p>
+              <div className="flex items-end gap-1 h-20">
+                {last10.map((s, i) => {
+                  const pct = s.average_grade ?? 0
+                  const color = pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444'
+                  const subj = URT_SUBJECTS.find(u => u.id === s.subject)
+                  return (
+                    <div key={s.id} className="flex-1 flex flex-col items-center gap-1 group relative">
+                      <div
+                        className="w-full rounded-t-sm transition-all duration-300 cursor-default"
+                        style={{ height: `${pct}%`, backgroundColor: color, minHeight: 4 }}
+                        title={`${subj?.name ?? 'URT'}: ${pct}%`}
+                      />
+                      <span className="text-[10px] text-zinc-400 truncate w-full text-center">
+                        {subj?.name?.substring(0, 3) ?? `#${i + 1}`}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   )
 }
 
@@ -244,11 +400,12 @@ const DURATIONS = [
 ]
 
 export function PracticeTrackerPage() {
-  const { sessions, loading, saveSession } = usePractice()
+  const { sessions, loading, saveSession, updateSession, getPassages } = usePractice()
 
   // Setup state
   const [mode, setMode] = useState<PracticeMode>('stopwatch')
   const [targetSeconds, setTargetSeconds] = useState(30 * 60)
+  const [subject, setSubject] = useState<string>(URT_SUBJECTS[0].id)
 
   // Active timer state
   const [pageState, setPageState] = useState<PageState>('setup')
@@ -256,6 +413,9 @@ export function PracticeTrackerPage() {
   const [paused, setPaused] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [finalElapsed, setFinalElapsed] = useState(0)
+
+  // Edit state
+  const [editingSession, setEditingSession] = useState<PracticeSession | null>(null)
 
   const startedAtRef = useRef<number | null>(null)
   const pausedAtRef = useRef<number | null>(null)
@@ -268,7 +428,6 @@ export function PracticeTrackerPage() {
     const secs = Math.floor(Math.max(0, raw))
     setElapsed(secs)
     if (mode === 'timer' && secs >= targetSeconds) {
-      // Time's up
       if (intervalRef.current) clearInterval(intervalRef.current)
       setFinalElapsed(targetSeconds)
       setPageState('done')
@@ -292,14 +451,12 @@ export function PracticeTrackerPage() {
 
   function handlePause() {
     if (paused) {
-      // Resume
       const pauseDuration = pausedAtRef.current ? Date.now() - pausedAtRef.current : 0
       totalPausedRef.current += pauseDuration
       pausedAtRef.current = null
       setPaused(false)
       intervalRef.current = setInterval(tick, 500)
     } else {
-      // Pause
       pausedAtRef.current = Date.now()
       if (intervalRef.current) clearInterval(intervalRef.current)
       setPaused(true)
@@ -325,38 +482,25 @@ export function PracticeTrackerPage() {
   }
 
   async function handleSavePassages(grades: number[]) {
-    await saveSession({
-      mode,
-      targetSeconds,
-      actualSeconds: finalElapsed,
-      grades,
-    })
+    await saveSession({ mode, subject: subject ?? null, targetSeconds, actualSeconds: finalElapsed, grades })
     setShowModal(false)
     setPageState('setup')
   }
 
   async function handleSkipPassages() {
-    await saveSession({
-      mode,
-      targetSeconds,
-      actualSeconds: finalElapsed,
-      grades: [],
-    })
+    await saveSession({ mode, subject: subject ?? null, targetSeconds, actualSeconds: finalElapsed, grades: [] })
     setShowModal(false)
     setPageState('setup')
   }
 
-  // Derived display values
   const displaySeconds = mode === 'timer' ? Math.max(0, targetSeconds - elapsed) : elapsed
-  const progress = mode === 'timer'
-    ? elapsed / targetSeconds
-    : Math.min(1, elapsed / targetSeconds)
-
+  const progress = mode === 'timer' ? elapsed / targetSeconds : Math.min(1, elapsed / targetSeconds)
   const circumference = 2 * Math.PI * 80
   const dashOffset = circumference * (1 - Math.min(1, progress))
+  const activeColor = subjectColor(subject)
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">URT Tracker</h1>
@@ -369,58 +513,51 @@ export function PracticeTrackerPage() {
         {/* Timer Card */}
         <Card padding="lg">
           {pageState === 'setup' ? (
-            <div className="space-y-6">
+            <div className="space-y-5">
+              {/* Subject selector */}
+              <div>
+                <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Subject</p>
+                <div className="flex flex-wrap gap-2">
+                  {URT_SUBJECTS.map(s => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSubject(s.id)}
+                      className={['px-3 py-1.5 rounded-lg border-2 text-sm font-semibold transition-all', subject === s.id ? 'text-white shadow-sm' : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'].join(' ')}
+                      style={subject === s.id ? { borderColor: s.color, backgroundColor: s.color } : {}}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Mode selector */}
               <div>
-                <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
-                  Mode
-                </p>
+                <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Mode</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setMode('stopwatch')}
-                    className={[
-                      'flex flex-col items-center gap-2 py-4 px-3 rounded-xl border-2 transition-all',
-                      mode === 'stopwatch'
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300'
-                        : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600',
-                    ].join(' ')}
-                  >
-                    <Watch size={24} />
-                    <span className="text-sm font-semibold">Stopwatch</span>
-                    <span className="text-xs opacity-70">Count up</span>
-                  </button>
-                  <button
-                    onClick={() => setMode('timer')}
-                    className={[
-                      'flex flex-col items-center gap-2 py-4 px-3 rounded-xl border-2 transition-all',
-                      mode === 'timer'
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300'
-                        : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600',
-                    ].join(' ')}
-                  >
-                    <Timer size={24} />
-                    <span className="text-sm font-semibold">Timer</span>
-                    <span className="text-xs opacity-70">Count down</span>
-                  </button>
+                  {(['stopwatch', 'timer'] as PracticeMode[]).map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setMode(m)}
+                      className={['flex flex-col items-center gap-2 py-4 px-3 rounded-xl border-2 transition-all', mode === m ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300' : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600'].join(' ')}
+                    >
+                      {m === 'stopwatch' ? <Watch size={24} /> : <Timer size={24} />}
+                      <span className="text-sm font-semibold capitalize">{m}</span>
+                      <span className="text-xs opacity-70">{m === 'stopwatch' ? 'Count up' : 'Count down'}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Duration selector */}
               <div>
-                <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
-                  Duration
-                </p>
+                <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Duration</p>
                 <div className="grid grid-cols-3 gap-2">
                   {DURATIONS.map(d => (
                     <button
                       key={d.seconds}
                       onClick={() => setTargetSeconds(d.seconds)}
-                      className={[
-                        'py-2.5 rounded-xl border-2 text-sm font-semibold transition-all',
-                        targetSeconds === d.seconds
-                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300'
-                          : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300',
-                      ].join(' ')}
+                      className={['py-2.5 rounded-xl border-2 text-sm font-semibold transition-all', targetSeconds === d.seconds ? 'border-primary-500 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300' : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'].join(' ')}
                     >
                       {d.label}
                     </button>
@@ -428,71 +565,48 @@ export function PracticeTrackerPage() {
                 </div>
               </div>
 
-              {/* Start button */}
               <button
                 onClick={handleStart}
-                className="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                style={{ backgroundColor: activeColor }}
               >
                 <Play size={18} fill="currentColor" />
-                Start Practice
+                Start Practice — {URT_SUBJECTS.find(s => s.id === subject)?.name}
               </button>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-6">
+              {/* Subject badge */}
+              <span className="px-3 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: activeColor + '22', color: activeColor }}>
+                {URT_SUBJECTS.find(s => s.id === subject)?.name}
+              </span>
+
               {/* Circular timer */}
               <div className="relative w-52 h-52">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 200 200">
-                  {/* Background track */}
-                  <circle cx="100" cy="100" r="80"
-                    fill="none" stroke="currentColor"
-                    className="text-zinc-100 dark:text-zinc-800"
-                    strokeWidth="10" />
-                  {/* Progress */}
-                  <circle cx="100" cy="100" r="80"
-                    fill="none"
-                    stroke={paused ? '#a1a1aa' : '#6366f1'}
-                    strokeWidth="10"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={dashOffset}
-                    style={{ transition: 'stroke-dashoffset 0.5s linear' }}
-                  />
+                  <circle cx="100" cy="100" r="80" fill="none" stroke="currentColor" className="text-zinc-100 dark:text-zinc-800" strokeWidth="10" />
+                  <circle cx="100" cy="100" r="80" fill="none" stroke={paused ? '#a1a1aa' : activeColor} strokeWidth="10" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} style={{ transition: 'stroke-dashoffset 0.5s linear' }} />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-mono font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
-                    {fmt(displaySeconds)}
-                  </span>
-                  <span className="text-xs text-zinc-400 mt-1">
-                    {mode === 'timer' ? 'remaining' : 'elapsed'}
-                  </span>
-                  {paused && (
-                    <span className="text-xs text-amber-500 font-medium mt-1">Paused</span>
-                  )}
+                  <span className="text-4xl font-mono font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{fmt(displaySeconds)}</span>
+                  <span className="text-xs text-zinc-400 mt-1">{mode === 'timer' ? 'remaining' : 'elapsed'}</span>
+                  {paused && <span className="text-xs text-amber-500 font-medium mt-1">Paused</span>}
                 </div>
               </div>
 
               {/* Controls */}
               <div className="flex gap-3">
-                <button
-                  onClick={handlePause}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                >
+                <button onClick={handlePause} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-sm font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
                   {paused ? <Play size={16} fill="currentColor" /> : <Pause size={16} />}
                   {paused ? 'Resume' : 'Pause'}
                 </button>
-                <button
-                  onClick={handleStop}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold hover:bg-zinc-700 dark:hover:bg-zinc-100 transition-colors"
-                >
+                <button onClick={handleStop} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-bold hover:bg-zinc-700 dark:hover:bg-zinc-100 transition-colors">
                   <Square size={16} fill="currentColor" />
                   Finish
                 </button>
               </div>
 
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
-              >
+              <button onClick={handleReset} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
                 <RotateCcw size={13} />
                 Cancel & Reset
               </button>
@@ -509,9 +623,7 @@ export function PracticeTrackerPage() {
 
           {loading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-14 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
-              ))}
+              {[1, 2, 3].map(i => <div key={i} className="h-14 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />)}
             </div>
           ) : sessions.length === 0 ? (
             <div className="py-10 text-center">
@@ -520,18 +632,34 @@ export function PracticeTrackerPage() {
               <p className="text-xs text-zinc-400 mt-1">Complete your first session above!</p>
             </div>
           ) : (
-            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {sessions.map(s => <HistoryRow key={s.id} session={s} />)}
+            <div className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-[420px] overflow-y-auto">
+              {sessions.map(s => (
+                <HistoryRow key={s.id} session={s} onEdit={() => setEditingSession(s)} />
+              ))}
             </div>
           )}
         </Card>
       </div>
 
-      {/* Passages Modal */}
+      {/* Analytics Section */}
+      {sessions.length > 0 && <UrtAnalytics sessions={sessions} />}
+
+      {/* Passages Modal (new session) */}
       {showModal && (
         <PassagesModal
+          title={`Session Complete — ${URT_SUBJECTS.find(s => s.id === subject)?.name}`}
           onSave={handleSavePassages}
           onSkip={handleSkipPassages}
+        />
+      )}
+
+      {/* Edit Session Modal */}
+      {editingSession && (
+        <EditSessionModal
+          session={editingSession}
+          getPassages={getPassages}
+          onUpdate={updateSession}
+          onClose={() => setEditingSession(null)}
         />
       )}
     </div>

@@ -133,5 +133,9 @@ export function useAnalytics(range: AnalyticsRange, referenceDate: Date = new Da
   const totalSeconds = subjectStats.reduce((sum, s) => sum + s.total_seconds, 0)
   const topSubject = subjectStats[0] ?? null
 
-  return { sessions, loading, subjectStats, dailyStats, timelineBlocks, totalSeconds, topSubject }
+  // Expose date range strings for consumers (e.g. daily log fetching)
+  const fromDateStr = fromIso.substring(0, 10)
+  const toDateStr = toIso.substring(0, 10)
+
+  return { sessions, loading, subjectStats, dailyStats, timelineBlocks, totalSeconds, topSubject, fromDateStr, toDateStr }
 }

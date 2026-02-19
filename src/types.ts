@@ -6,6 +6,7 @@ export interface Profile {
   full_name: string | null
   avatar_url: string | null
   created_at: string
+  hidden_from_leaderboard?: boolean
 }
 
 // ─── Subjects ─────────────────────────────────────────────────────────────────
@@ -136,10 +137,22 @@ export interface PracticeSession {
   id: string
   user_id: string
   mode: PracticeMode
+  subject: string | null
   target_seconds: number
   actual_seconds: number
   passage_count: number
   average_grade: number | null
+  created_at: string
+}
+
+// ─── Daily Log ─────────────────────────────────────────────────────────────────
+
+export interface DailyLog {
+  id: string
+  user_id: string
+  date: string       // 'yyyy-MM-dd'
+  wake_time: string  // 'HH:MM:SS' from Postgres time
+  sleep_time: string
   created_at: string
 }
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import {
-  Users, Plus, LogIn, Trophy, Crown, Medal, Copy, Check, Globe, Lock,
+  Users, Plus, LogIn, Trophy, Crown, Medal, Copy, Check, Globe, Lock, Eye, EyeOff,
 } from 'lucide-react'
 import { useGroups, useGroupMembers, useLeaderboard } from '../hooks/useSocial'
 import { useAuth } from '../contexts/AuthContext'
@@ -12,7 +12,7 @@ import { formatHumanDuration } from '../utils/time'
 import type { Group, LeaderboardEntry } from '../types'
 
 export function SocialPage() {
-  const { user } = useAuth()
+  const { user, profile, updateProfile } = useAuth()
   const { groups, loading: groupsLoading, createGroup, joinGroupByCode, leaveGroup } = useGroups()
   const { entries: globalEntries, loading: globalLoading } = useLeaderboard(undefined, 7)
 
@@ -20,6 +20,19 @@ export function SocialPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
   const [tab, setTab] = useState<'groups' | 'global'>('groups')
+  const [togglingHide, setTogglingHide] = useState(false)
+
+  const isHidden = profile?.hidden_from_leaderboard ?? false
+
+  async function toggleHide() {
+    setTogglingHide(true)
+    try { await updateProfile({ hidden_from_leaderboard: !isHidden }) } finally { setTogglingHide(false) }
+  }
+
+  // Filter self from display when hidden
+  const displayedGlobalEntries = isHidden
+    ? globalEntries.filter(e => e.user_id !== user?.id)
+    : globalEntries
 
   return (
     <div className="space-y-6">
@@ -131,17 +144,40 @@ export function SocialPage() {
       {/* Global leaderboard tab */}
       {tab === 'global' && (
         <Card padding="lg">
-          <div className="flex items-center gap-2 mb-5">
-            <Trophy size={18} className="text-amber-500" />
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-              Global Leaderboard
-            </h2>
-            <span className="text-xs text-zinc-400 ml-1">— last 7 days</span>
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Trophy size={18} className="text-amber-500" />
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                Global Leaderboard
+              </h2>
+              <span className="text-xs text-zinc-400 ml-1">— last 7 days</span>
+            </div>
+            {/* Hide from leaderboard toggle */}
+            <button
+              onClick={toggleHide}
+              disabled={togglingHide}
+              title={isHidden ? 'You are hidden — click to reappear' : 'Click to hide yourself from the leaderboard'}
+              className={[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+                isHidden
+                  ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100'
+                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700',
+              ].join(' ')}
+            >
+              {isHidden ? <EyeOff size={13} /> : <Eye size={13} />}
+              {isHidden ? 'Hidden from rank' : 'Hide from rank'}
+            </button>
           </div>
+          {isHidden && (
+            <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+              <EyeOff size={13} />
+              You are currently hidden from the global leaderboard.
+            </div>
+          )}
           {globalLoading ? (
             <LeaderboardSkeleton />
           ) : (
-            <LeaderboardTable entries={globalEntries} currentUserId={user?.id ?? ''} />
+            <LeaderboardTable entries={displayedGlobalEntries} currentUserId={user?.id ?? ''} />
           )}
         </Card>
       )}

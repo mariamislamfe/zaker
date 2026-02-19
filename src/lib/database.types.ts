@@ -13,6 +13,7 @@ export type Database = {
           full_name: string | null
           avatar_url: string | null
           created_at: string
+          hidden_from_leaderboard: boolean
         }
         Insert: {
           id: string
@@ -20,6 +21,7 @@ export type Database = {
           full_name?: string | null
           avatar_url?: string | null
           created_at?: string
+          hidden_from_leaderboard?: boolean
         }
         Update: {
           id?: string
@@ -27,6 +29,7 @@ export type Database = {
           full_name?: string | null
           avatar_url?: string | null
           created_at?: string
+          hidden_from_leaderboard?: boolean
         }
         Relationships: []
       }
@@ -179,6 +182,7 @@ export type Database = {
           id: string
           user_id: string
           mode: 'stopwatch' | 'timer'
+          subject: string | null
           target_seconds: number
           actual_seconds: number
           passage_count: number
@@ -189,6 +193,7 @@ export type Database = {
           id?: string
           user_id: string
           mode: string
+          subject?: string | null
           target_seconds: number
           actual_seconds: number
           passage_count?: number
@@ -199,10 +204,38 @@ export type Database = {
           id?: string
           user_id?: string
           mode?: string
+          subject?: string | null
           target_seconds?: number
           actual_seconds?: number
           passage_count?: number
           average_grade?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      daily_logs: {
+        Row: {
+          id: string
+          user_id: string
+          date: string
+          wake_time: string
+          sleep_time: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          date: string
+          wake_time: string
+          sleep_time: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          date?: string
+          wake_time?: string
+          sleep_time?: string
           created_at?: string
         }
         Relationships: []
