@@ -240,6 +240,45 @@ export type Database = {
         }
         Relationships: []
       }
+      curriculum_items: {
+        Row: {
+          id: string
+          user_id: string
+          subject_name: string
+          chapter: string | null
+          title: string
+          studied: boolean
+          reviewed: boolean
+          solved: boolean
+          order_index: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          subject_name: string
+          chapter?: string | null
+          title: string
+          studied?: boolean
+          reviewed?: boolean
+          solved?: boolean
+          order_index?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          subject_name?: string
+          chapter?: string | null
+          title?: string
+          studied?: boolean
+          reviewed?: boolean
+          solved?: boolean
+          order_index?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       practice_passages: {
         Row: {
           id: string

@@ -1,7 +1,7 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, BookOpen, BarChart2, Users, LogOut, Sun, Moon, Zap, ClipboardList,
+  LayoutDashboard, BookOpen, BarChart2, Users, LogOut, Sun, Moon, Zap, ClipboardList, GraduationCap,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { label: 'Subjects', path: '/subjects', icon: BookOpen },
   { label: 'Analytics', path: '/analytics', icon: BarChart2 },
   { label: 'URT Tracker', path: '/urt', icon: ClipboardList },
+  { label: 'Curriculum', path: '/curriculum', icon: GraduationCap },
   { label: 'Social', path: '/social', icon: Users },
 ]
 

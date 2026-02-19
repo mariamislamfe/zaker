@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { BookOpen, Clock, TrendingUp, Calendar, AlertCircle } from 'lucide-react'
+import { format } from 'date-fns'
 import { useAuth } from '../contexts/AuthContext'
 import { useTimerContext } from '../contexts/TimerContext'
 import { useSubjects } from '../hooks/useSubjects'
 import { useAnalytics } from '../hooks/useAnalytics'
+import { usePractice } from '../hooks/usePractice'
 import { TimerDisplay } from '../components/timer/TimerDisplay'
 import { TimerControls } from '../components/timer/TimerControls'
 import { Card, StatCard } from '../components/ui/Card'
@@ -16,6 +18,14 @@ export function DashboardPage() {
   const { subjects } = useSubjects()
   const { timerState, elapsed, breakElapsed, startSession, startBreak, endBreak, stopSession, discardSession } = useTimerContext()
   const { subjectStats, totalSeconds, loading: analyticsLoading } = useAnalytics('day')
+  const { sessions: practiceSessions } = usePractice()
+
+  // Sum URT actual_seconds for today (local date)
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const urtTodaySeconds = practiceSessions
+    .filter(s => format(new Date(s.created_at), 'yyyy-MM-dd') === todayStr)
+    .reduce((sum, s) => sum + s.actual_seconds, 0)
+  const totalStudySeconds = totalSeconds + urtTodaySeconds
 
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(
     timerState.subjectId
@@ -73,8 +83,8 @@ export function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Today's Study"
-          value={formatHumanDuration(totalSeconds)}
-          sub="all subjects"
+          value={formatHumanDuration(totalStudySeconds)}
+          sub={urtTodaySeconds > 0 ? `study + ${formatHumanDuration(urtTodaySeconds)} URT` : 'all subjects'}
           icon={<Clock size={18} />}
         />
         <StatCard
