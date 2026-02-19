@@ -300,6 +300,33 @@ export type Database = {
         }
         Relationships: []
       }
+      urt_subjects: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          color: string
+          order_index: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          color?: string
+          order_index?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          color?: string
+          order_index?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

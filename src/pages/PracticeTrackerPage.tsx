@@ -1,25 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Timer, Watch, Play, Pause, Square, RotateCcw, BookOpen, Pencil,
-  TrendingUp, BarChart2, ChevronDown, ChevronUp,
+  TrendingUp, BarChart2, ChevronDown, ChevronUp, Plus, X,
 } from 'lucide-react'
 import { usePractice } from '../hooks/usePractice'
+import { useURTSubjects } from '../hooks/useURTSubjects'
 import { Card } from '../components/ui/Card'
 import type { PracticeMode, PracticeSession } from '../types'
 
-// ─── URT Fixed Subjects ────────────────────────────────────────────────────────
+// ─── Color Swatches ────────────────────────────────────────────────────────────
 
-const URT_SUBJECTS = [
-  { id: 'Math',      name: 'Math',      color: '#3b82f6' },
-  { id: 'Mechanics', name: 'Mechanics', color: '#f59e0b' },
-  { id: 'English',   name: 'English',   color: '#10b981' },
-  { id: 'Physics',   name: 'Physics',   color: '#8b5cf6' },
-  { id: 'Chemistry', name: 'Chemistry', color: '#ef4444' },
+const COLOR_SWATCHES = [
+  '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444',
+  '#ec4899', '#f97316', '#06b6d4', '#84cc16', '#6366f1',
 ]
-
-function subjectColor(name: string | null): string {
-  return URT_SUBJECTS.find(s => s.id === name)?.color ?? '#6366f1'
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,7 +31,7 @@ interface PassageScore { correct: string; total: string }
 
 interface PassagesModalProps {
   title?: string
-  initialGrades?: number[]   // pre-filled when editing
+  initialGrades?: number[]
   onSave: (grades: number[]) => void
   onSkip?: () => void
   onCancel?: () => void
@@ -200,7 +194,11 @@ function EditSessionModal({ session, getPassages, onUpdate, onClose }: {
 
 // ─── History Row ──────────────────────────────────────────────────────────────
 
-function HistoryRow({ session, onEdit }: { session: PracticeSession; onEdit: () => void }) {
+function HistoryRow({ session, subjectColor, onEdit }: {
+  session: PracticeSession
+  subjectColor: (name: string | null) => string
+  onEdit: () => void
+}) {
   const date = new Date(session.created_at)
   const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
@@ -253,18 +251,24 @@ function HistoryRow({ session, onEdit }: { session: PracticeSession; onEdit: () 
 
 // ─── URT Analytics Section ─────────────────────────────────────────────────────
 
-function UrtAnalytics({ sessions }: { sessions: PracticeSession[] }) {
+function UrtAnalytics({ sessions, subjectColor }: {
+  sessions: PracticeSession[]
+  subjectColor: (name: string | null) => string
+}) {
   const [expanded, setExpanded] = useState(false)
 
-  // Per-subject aggregate stats
-  const subjectStats = URT_SUBJECTS.map(subj => {
-    const sub = sessions.filter(s => s.subject === subj.id && s.average_grade !== null)
-    const allSessions = sessions.filter(s => s.subject === subj.id)
-    if (allSessions.length === 0) return null
-    const grades = sub.map(s => s.average_grade as number)
+  // Derive unique subjects from session data (preserves historical subjects even if removed)
+  const sessionSubjectNames = [...new Set(
+    sessions.map(s => s.subject).filter((s): s is string => s !== null && s !== '')
+  )]
+
+  const subjectStats = sessionSubjectNames.map(name => {
+    const color = subjectColor(name)
+    const gradedSessions = sessions.filter(s => s.subject === name && s.average_grade !== null)
+    const allSessions = sessions.filter(s => s.subject === name)
+    const grades = gradedSessions.map(s => s.average_grade as number)
     const avg = grades.length > 0 ? Math.round(grades.reduce((a, b) => a + b, 0) / grades.length) : null
 
-    // Trend: compare last 3 vs previous 3
     let trend: 'up' | 'down' | 'flat' = 'flat'
     if (grades.length >= 2) {
       const half = Math.ceil(grades.length / 2)
@@ -276,12 +280,10 @@ function UrtAnalytics({ sessions }: { sessions: PracticeSession[] }) {
       else if (recentAvg < olderAvg - 2) trend = 'down'
     }
 
-    return { ...subj, avg, trend, sessionCount: allSessions.length, gradedCount: sub.length }
-  }).filter(Boolean) as (typeof URT_SUBJECTS[0] & { avg: number | null; trend: 'up' | 'down' | 'flat'; sessionCount: number; gradedCount: number })[]
+    return { name, color, avg, trend, sessionCount: allSessions.length, gradedCount: gradedSessions.length }
+  })
 
-  const active = subjectStats.filter(s => s.sessionCount > 0)
-
-  if (active.length === 0) return null
+  if (subjectStats.length === 0) return null
 
   // Last 10 graded sessions for trend chart
   const last10 = sessions.filter(s => s.average_grade !== null).slice(0, 10).reverse()
@@ -304,43 +306,34 @@ function UrtAnalytics({ sessions }: { sessions: PracticeSession[] }) {
         <div className="mt-5 space-y-5">
           {/* Per-subject performance cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {URT_SUBJECTS.map(subj => {
-              const stat = active.find(s => s.id === subj.id)
-              return (
-                <div
-                  key={subj.id}
-                  className="rounded-xl p-3 border-2"
-                  style={{ borderColor: subj.color + '44', backgroundColor: subj.color + '11' }}
-                >
-                  <p className="text-xs font-bold mb-1" style={{ color: subj.color }}>{subj.name}</p>
-                  {stat ? (
-                    <>
-                      <p className={['text-xl font-bold', stat.avg !== null && stat.avg >= 80 ? 'text-emerald-600' : stat.avg !== null && stat.avg >= 60 ? 'text-amber-500' : 'text-red-500'].join(' ')}>
-                        {stat.avg !== null ? `${stat.avg}%` : '—'}
-                      </p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <span className="text-xs text-zinc-400">{stat.sessionCount} sessions</span>
-                        {stat.trend === 'up' && <TrendingUp size={11} className="text-emerald-500" />}
-                        {stat.trend === 'down' && <TrendingUp size={11} className="text-red-500 rotate-180" />}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-xs text-zinc-400 mt-1">No data</p>
-                  )}
+            {subjectStats.map(subj => (
+              <div
+                key={subj.name}
+                className="rounded-xl p-3 border-2"
+                style={{ borderColor: subj.color + '44', backgroundColor: subj.color + '11' }}
+              >
+                <p className="text-xs font-bold mb-1 truncate" style={{ color: subj.color }}>{subj.name}</p>
+                <p className={['text-xl font-bold', subj.avg !== null && subj.avg >= 80 ? 'text-emerald-600' : subj.avg !== null && subj.avg >= 60 ? 'text-amber-500' : 'text-red-500'].join(' ')}>
+                  {subj.avg !== null ? `${subj.avg}%` : '—'}
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs text-zinc-400">{subj.sessionCount} sessions</span>
+                  {subj.trend === 'up' && <TrendingUp size={11} className="text-emerald-500" />}
+                  {subj.trend === 'down' && <TrendingUp size={11} className="text-red-500 rotate-180" />}
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
 
           {/* Average grade bars per subject */}
-          {active.filter(s => s.avg !== null).length > 0 && (
+          {subjectStats.filter(s => s.avg !== null).length > 0 && (
             <div>
               <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
                 Average Grade by Subject
               </p>
               <div className="space-y-3">
-                {active.filter(s => s.avg !== null).sort((a, b) => (b.avg ?? 0) - (a.avg ?? 0)).map(s => (
-                  <div key={s.id}>
+                {subjectStats.filter(s => s.avg !== null).sort((a, b) => (b.avg ?? 0) - (a.avg ?? 0)).map(s => (
+                  <div key={s.name}>
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{s.name}</span>
                       <span className={['text-sm font-bold', (s.avg ?? 0) >= 80 ? 'text-emerald-600' : (s.avg ?? 0) >= 60 ? 'text-amber-500' : 'text-red-500'].join(' ')}>
@@ -356,7 +349,7 @@ function UrtAnalytics({ sessions }: { sessions: PracticeSession[] }) {
             </div>
           )}
 
-          {/* Grade trend — last 10 sessions */}
+          {/* Grade trend — last 10 graded sessions */}
           {last10.length >= 2 && (
             <div>
               <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
@@ -366,17 +359,15 @@ function UrtAnalytics({ sessions }: { sessions: PracticeSession[] }) {
                 {last10.map((s, i) => {
                   const pct = s.average_grade ?? 0
                   const color = pct >= 80 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444'
-                  const subj = URT_SUBJECTS.find(u => u.id === s.subject)
+                  const label = s.subject?.substring(0, 3) ?? `#${i + 1}`
                   return (
                     <div key={s.id} className="flex-1 flex flex-col items-center gap-1 group relative">
                       <div
                         className="w-full rounded-t-sm transition-all duration-300 cursor-default"
                         style={{ height: `${pct}%`, backgroundColor: color, minHeight: 4 }}
-                        title={`${subj?.name ?? 'URT'}: ${pct}%`}
+                        title={`${s.subject ?? 'URT'}: ${pct}%`}
                       />
-                      <span className="text-[10px] text-zinc-400 truncate w-full text-center">
-                        {subj?.name?.substring(0, 3) ?? `#${i + 1}`}
-                      </span>
+                      <span className="text-[10px] text-zinc-400 truncate w-full text-center">{label}</span>
                     </div>
                   )
                 })}
@@ -401,11 +392,24 @@ const DURATIONS = [
 
 export function PracticeTrackerPage() {
   const { sessions, loading, saveSession, updateSession, getPassages } = usePractice()
+  const { subjects, loading: subjectsLoading, addSubject, removeSubject, seedDefaults, subjectColor } = useURTSubjects()
 
   // Setup state
   const [mode, setMode] = useState<PracticeMode>('stopwatch')
   const [targetSeconds, setTargetSeconds] = useState(30 * 60)
-  const [subject, setSubject] = useState<string>(URT_SUBJECTS[0].id)
+  const [subject, setSubject] = useState<string | null>(null)
+
+  // Auto-select first subject when subjects load
+  useEffect(() => {
+    if (subjects.length > 0 && !subject) {
+      setSubject(subjects[0].name)
+    }
+  }, [subjects, subject])
+
+  // Add subject UI state
+  const [showAddSubject, setShowAddSubject] = useState(false)
+  const [newSubjectName, setNewSubjectName] = useState('')
+  const [newSubjectColor, setNewSubjectColor] = useState(COLOR_SWATCHES[0])
 
   // Active timer state
   const [pageState, setPageState] = useState<PageState>('setup')
@@ -493,6 +497,18 @@ export function PracticeTrackerPage() {
     setPageState('setup')
   }
 
+  async function handleAddSubject() {
+    const trimmed = newSubjectName.trim()
+    if (!trimmed) return
+    const added = await addSubject(trimmed, newSubjectColor)
+    if (added) {
+      setSubject(added.name)
+      setNewSubjectName('')
+      setNewSubjectColor(COLOR_SWATCHES[0])
+      setShowAddSubject(false)
+    }
+  }
+
   const displaySeconds = mode === 'timer' ? Math.max(0, targetSeconds - elapsed) : elapsed
   const progress = mode === 'timer' ? elapsed / targetSeconds : Math.min(1, elapsed / targetSeconds)
   const circumference = 2 * Math.PI * 80
@@ -517,18 +533,87 @@ export function PracticeTrackerPage() {
               {/* Subject selector */}
               <div>
                 <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Subject</p>
-                <div className="flex flex-wrap gap-2">
-                  {URT_SUBJECTS.map(s => (
+
+                {subjectsLoading ? (
+                  <div className="h-9 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
+                ) : subjects.length === 0 ? (
+                  <div className="text-center py-5 border-2 border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl">
+                    <p className="text-sm text-zinc-400 mb-2">No subjects yet</p>
                     <button
-                      key={s.id}
-                      onClick={() => setSubject(s.id)}
-                      className={['px-3 py-1.5 rounded-lg border-2 text-sm font-semibold transition-all', subject === s.id ? 'text-white shadow-sm' : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'].join(' ')}
-                      style={subject === s.id ? { borderColor: s.color, backgroundColor: s.color } : {}}
+                      onClick={seedDefaults}
+                      className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
                     >
-                      {s.name}
+                      Load defaults (Math, Physics, English…)
                     </button>
-                  ))}
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {subjects.map(s => (
+                      <div key={s.id} className="relative group">
+                        <button
+                          onClick={() => setSubject(s.name)}
+                          className={[
+                            'px-3 py-1.5 pr-6 rounded-lg border-2 text-sm font-semibold transition-all',
+                            subject === s.name
+                              ? 'text-white shadow-sm'
+                              : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300',
+                          ].join(' ')}
+                          style={subject === s.name ? { borderColor: s.color, backgroundColor: s.color } : {}}
+                        >
+                          {s.name}
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); removeSubject(s.id) }}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-zinc-200 dark:bg-zinc-600 hover:bg-red-400 hover:text-white text-zinc-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                          title="Remove subject"
+                        >
+                          <X size={9} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Add subject */}
+                    {showAddSubject ? (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-950">
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="Name"
+                          value={newSubjectName}
+                          onChange={e => setNewSubjectName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddSubject(); if (e.key === 'Escape') setShowAddSubject(false) }}
+                          className="text-sm bg-transparent outline-none text-zinc-800 dark:text-zinc-200 w-24"
+                        />
+                        <div className="flex gap-1 flex-wrap">
+                          {COLOR_SWATCHES.map(c => (
+                            <button
+                              key={c}
+                              onClick={() => setNewSubjectColor(c)}
+                              className="w-4 h-4 rounded-full transition-all shrink-0"
+                              style={{
+                                backgroundColor: c,
+                                outline: newSubjectColor === c ? `2px solid ${c}` : '2px solid transparent',
+                                outlineOffset: '2px',
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <button onClick={handleAddSubject} className="text-xs text-primary-600 dark:text-primary-400 font-semibold hover:underline whitespace-nowrap">Add</button>
+                        <button onClick={() => setShowAddSubject(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowAddSubject(true)}
+                        className="px-3 py-1.5 rounded-lg border-2 border-dashed border-zinc-300 dark:border-zinc-600 text-sm text-zinc-400 hover:border-primary-400 hover:text-primary-500 dark:hover:border-primary-600 dark:hover:text-primary-400 transition-all flex items-center gap-1"
+                      >
+                        <Plus size={14} />
+                        Add
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Mode selector */}
@@ -567,19 +652,22 @@ export function PracticeTrackerPage() {
 
               <button
                 onClick={handleStart}
-                className="w-full py-3 rounded-xl text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                disabled={subjects.length > 0 && !subject}
+                className="w-full py-3 rounded-xl text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ backgroundColor: activeColor }}
               >
                 <Play size={18} fill="currentColor" />
-                Start Practice — {URT_SUBJECTS.find(s => s.id === subject)?.name}
+                Start Practice{subject ? ` — ${subject}` : ''}
               </button>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-6">
               {/* Subject badge */}
-              <span className="px-3 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: activeColor + '22', color: activeColor }}>
-                {URT_SUBJECTS.find(s => s.id === subject)?.name}
-              </span>
+              {subject && (
+                <span className="px-3 py-1 rounded-full text-sm font-semibold" style={{ backgroundColor: activeColor + '22', color: activeColor }}>
+                  {subject}
+                </span>
+              )}
 
               {/* Circular timer */}
               <div className="relative w-52 h-52">
@@ -634,7 +722,7 @@ export function PracticeTrackerPage() {
           ) : (
             <div className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-[420px] overflow-y-auto">
               {sessions.map(s => (
-                <HistoryRow key={s.id} session={s} onEdit={() => setEditingSession(s)} />
+                <HistoryRow key={s.id} session={s} subjectColor={subjectColor} onEdit={() => setEditingSession(s)} />
               ))}
             </div>
           )}
@@ -642,12 +730,12 @@ export function PracticeTrackerPage() {
       </div>
 
       {/* Analytics Section */}
-      {sessions.length > 0 && <UrtAnalytics sessions={sessions} />}
+      {sessions.length > 0 && <UrtAnalytics sessions={sessions} subjectColor={subjectColor} />}
 
       {/* Passages Modal (new session) */}
       {showModal && (
         <PassagesModal
-          title={`Session Complete — ${URT_SUBJECTS.find(s => s.id === subject)?.name}`}
+          title={`Session Complete${subject ? ` — ${subject}` : ''}`}
           onSave={handleSavePassages}
           onSkip={handleSkipPassages}
         />
