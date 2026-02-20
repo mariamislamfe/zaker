@@ -64,6 +64,15 @@ function SubjectRow({ s }: { s: SubjectReadiness }) {
   )
 }
 
+// ─── Risk meta ───────────────────────────────────────────────────────────────
+
+const RISK_META = {
+  low:      { label: 'خطر منخفض', text: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/30',   border: 'border-emerald-200 dark:border-emerald-800' },
+  medium:   { label: 'خطر متوسط', text: 'text-amber-700 dark:text-amber-300',     bg: 'bg-amber-50 dark:bg-amber-950/30',       border: 'border-amber-200 dark:border-amber-800'   },
+  high:     { label: 'خطر عالي',  text: 'text-orange-700 dark:text-orange-300',   bg: 'bg-orange-50 dark:bg-orange-950/30',     border: 'border-orange-200 dark:border-orange-800' },
+  critical: { label: 'خطر حرج',   text: 'text-red-700 dark:text-red-300',         bg: 'bg-red-50 dark:bg-red-950/30',           border: 'border-red-200 dark:border-red-800'       },
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export function ReadinessReport() {
@@ -151,6 +160,36 @@ export function ReadinessReport() {
           <CircularScore pct={report.overallPct} />
           <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed flex-1">{report.aiSummary}</p>
         </div>
+
+        {/* ── Risk of Failure Prediction ── */}
+        {(() => {
+          const meta = RISK_META[report.riskLevel]
+          return (
+            <div className={`p-4 rounded-xl border ${meta.bg} ${meta.border}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-[10px] font-bold uppercase tracking-widest opacity-60 ${meta.text}`}>
+                  Risk of Failure Prediction
+                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${meta.text} ${meta.border} bg-white/40 dark:bg-black/20`}>
+                  {meta.label}
+                </span>
+              </div>
+              <p className={`text-3xl font-black leading-none mb-0.5 ${meta.text}`}>
+                {report.completionProbability}%
+              </p>
+              <p className={`text-xs opacity-60 mb-2 ${meta.text}`}>احتمال إنهاء الخطة قبل الامتحان</p>
+              {report.riskFactors.length > 0 && (
+                <ul className="space-y-0.5">
+                  {report.riskFactors.map((f, i) => (
+                    <li key={i} className={`text-xs flex items-start gap-1 ${meta.text}`}>
+                      <span className="opacity-40 shrink-0 mt-0.5">›</span>{f}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Subjects */}
         {report.subjects.length > 0 && (

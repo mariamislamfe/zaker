@@ -13,6 +13,7 @@ import { Card, StatCard } from '../components/ui/Card'
 import { ColorDot } from '../components/ui/Badge'
 import { formatHumanDuration } from '../utils/time'
 import { SleepWakeWidget } from '../components/ai/SleepWakeWidget'
+import { EditableTaskPanel } from '../components/ai/EditableTaskPanel'
 
 export function DashboardPage() {
   const { profile } = useAuth()
@@ -206,30 +207,8 @@ export function DashboardPage() {
           )}
         </Card>
 
-        {/* Quick links */}
-        <Card padding="lg">
-          <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-4">
-            Quick Access
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'Manage Subjects', desc: 'Add or edit your subjects', path: '/subjects', icon: '📚' },
-              { label: 'Analytics', desc: 'View your study trends', path: '/analytics', icon: '📊' },
-              { label: 'URT Tracker', desc: 'Track passages & grades', path: '/urt', icon: '📝' },
-              { label: 'Leaderboard', desc: 'Compare with friends', path: '/social', icon: '🏆' },
-            ].map(({ label, desc, path, icon }) => (
-              <Link
-                key={label}
-                to={path}
-                className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-primary-300 dark:hover:border-primary-700 hover:bg-primary-50 dark:hover:bg-primary-950 transition-all group"
-              >
-                <span className="text-2xl">{icon}</span>
-                <p className="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">{label}</p>
-                <p className="text-xs text-zinc-400 mt-0.5">{desc}</p>
-              </Link>
-            ))}
-          </div>
-        </Card>
+        {/* Today's tasks */}
+        <EditableTaskPanel date={todayStr} label="تاسكات النهارده" />
       </div>
     </div>
   )
