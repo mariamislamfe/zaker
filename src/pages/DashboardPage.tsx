@@ -12,6 +12,7 @@ import { TimerControls } from '../components/timer/TimerControls'
 import { Card, StatCard } from '../components/ui/Card'
 import { ColorDot } from '../components/ui/Badge'
 import { formatHumanDuration } from '../utils/time'
+import { SleepWakeWidget } from '../components/ai/SleepWakeWidget'
 
 export function DashboardPage() {
   const { profile } = useAuth()
@@ -70,13 +71,19 @@ export function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-          {greeting}, {profile?.username ?? 'there'} 👋
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+            {greeting}, {profile?.username ?? 'there'} 👋
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        {/* Compact sleep/wake tracker */}
+        <div className="shrink-0 pt-1">
+          <SleepWakeWidget compact />
+        </div>
       </div>
 
       {/* Stats row */}
