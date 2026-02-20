@@ -426,6 +426,27 @@ export type Database = {
         }
         Relationships: []
       }
+      sleep_logs: {
+        Row: {
+          id: string; user_id: string; log_date: string
+          wake_time: string | null; sleep_time: string | null
+          sleep_duration_minutes: number | null; notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string; user_id: string; log_date: string
+          wake_time?: string | null; sleep_time?: string | null
+          sleep_duration_minutes?: number | null; notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string; user_id?: string; log_date?: string
+          wake_time?: string | null; sleep_time?: string | null
+          sleep_duration_minutes?: number | null; notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

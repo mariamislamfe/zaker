@@ -262,6 +262,17 @@ export interface AIInsight {
   created_at: string
 }
 
+export interface SleepLog {
+  id: string
+  user_id: string
+  log_date: string               // 'yyyy-MM-dd'
+  wake_time: string | null       // ISO timestamptz — logged when user wakes up
+  sleep_time: string | null      // ISO timestamptz — logged when user goes to sleep
+  sleep_duration_minutes: number | null  // auto-calculated on sleep log
+  notes: string | null
+  created_at: string
+}
+
 // ─── UI ───────────────────────────────────────────────────────────────────────
 
 export type Theme = 'light' | 'dark'

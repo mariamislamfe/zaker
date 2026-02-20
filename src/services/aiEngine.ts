@@ -394,16 +394,29 @@ export async function generateNextDayPlan(
     await supabase.from('study_plans').delete().eq('id', existing.id)
   }
 
-  const [profile, weak, { data: subjects }, { data: curric }] = await Promise.all([
+  const [profile, weak, { data: subjects }, { data: curric }, { data: sleepLogs }] = await Promise.all([
     analyzeBehavior(userId, 14),
     detectWeakAreas(userId),
     supabase.from('subjects').select('id, name, color').eq('user_id', userId).eq('is_active', true),
     supabase.from('curriculum_items')
       .select('id, subject_id, title').eq('user_id', userId)
       .eq('studied', false).is('parent_id', null).limit(30),
+    supabase.from('sleep_logs').select('wake_time').eq('user_id', userId)
+      .order('log_date', { ascending: false }).limit(14),
   ])
 
   if (!subjects?.length) throw new Error('No active subjects found. Please add subjects first.')
+
+  // Use avg wake hour (+1h buffer) as the planning start, fall back to peakHour
+  const avgWakeHour: number = (() => {
+    const logs = (sleepLogs ?? []).filter(l => l.wake_time)
+    if (!logs.length) return profile.peakHour || 9
+    const totalMins = logs.reduce((sum: number, l) => {
+      const d = new Date(l.wake_time as string)
+      return sum + d.getHours() * 60 + d.getMinutes()
+    }, 0)
+    return Math.min(22, Math.floor(totalMins / logs.length / 60) + 1)
+  })()
 
   const targetHours = Math.max(2, Math.min(8, Math.round(profile.avgDailySeconds / 3600) || 4))
   const blockCount  = Math.min(subjects.length, Math.max(2, Math.floor(targetHours / 1.25)))
@@ -419,7 +432,7 @@ export async function generateNextDayPlan(
   }
 
   const tasks: GeneratedTask[] = []
-  let h = profile.peakHour || 9, m = 0
+  let h = avgWakeHour, m = 0
 
   for (let i = 0; i < Math.min(blockCount, prioritised.length); i++) {
     const subj      = prioritised[i]
@@ -574,6 +587,17 @@ export async function comparePlanVsActual(userId: string, date?: string): Promis
     missedSubjects,
     surplus:          actualMins > plannedMins * 1.2,
   }
+}
+
+// ─── getOverdueTasks ─────────────────────────────────────────────────────────
+// Returns count of pending tasks scheduled before today (overdue).
+
+export async function getOverdueTasks(userId: string): Promise<number> {
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const { count } = await supabase.from('plan_tasks')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId).eq('status', 'pending').lt('scheduled_date', today)
+  return count ?? 0
 }
 
 // ─── adjustPlan ──────────────────────────────────────────────────────────────
