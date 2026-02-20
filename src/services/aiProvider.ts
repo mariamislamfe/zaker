@@ -47,7 +47,11 @@ async function callK2Think(messages: AIMessage[], opts: AIOptions): Promise<stri
   }
 
   const json = await res.json()
-  return (json.choices?.[0]?.message?.content as string) ?? ''
+  let content = (json.choices?.[0]?.message?.content as string) ?? ''
+  // K2-Think includes chain-of-thought reasoning before </think> — strip it
+  const thinkEnd = content.indexOf('</think>')
+  if (thinkEnd !== -1) content = content.slice(thinkEnd + 8).trim()
+  return content
 }
 
 // ─── Heuristic mock ───────────────────────────────────────────────────────────
