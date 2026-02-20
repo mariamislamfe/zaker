@@ -60,51 +60,109 @@ export async function buildPlanFromDescription(
       .order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ])
 
-  const subjList  = (existingSubjects ?? []).map(s => s.name).join(', ')
-  const in14days  = format(addDays(new Date(), 14), 'yyyy-MM-dd')
-  const in21days  = format(addDays(new Date(), 21), 'yyyy-MM-dd')
-  const in30days  = format(addDays(new Date(), 30), 'yyyy-MM-dd')
+  const subjList = (existingSubjects ?? []).map(s => s.name).join(', ')
 
-  const systemPrompt = `You are an expert AI study planner. Analyze the description and output a complete structured plan.
+  // Pre-calculated absolute dates for the prompt
+  const d7  = format(addDays(new Date(), 7),  'yyyy-MM-dd')
+  const d14 = format(addDays(new Date(), 14), 'yyyy-MM-dd')
+  const d21 = format(addDays(new Date(), 21), 'yyyy-MM-dd')
+  const d30 = format(addDays(new Date(), 30), 'yyyy-MM-dd')
+  const d60 = format(addDays(new Date(), 60), 'yyyy-MM-dd')
+  const d90 = format(addDays(new Date(), 90), 'yyyy-MM-dd')
+
+  const systemPrompt = `You are an expert AI study planner inside Zaker app. Read the student's description carefully and output a complete structured study plan as JSON.
 
 TODAY: ${today}
-EXISTING SUBJECTS: ${subjList || 'none'}
-CURRENT GOAL: ${existingGoal ? `${existingGoal.title} — ${existingGoal.target_date}` : 'none'}
+EXISTING SUBJECTS: ${subjList || 'none yet'}
+CURRENT GOAL: ${existingGoal ? `${existingGoal.title} → ${existingGoal.target_date}` : 'none'}
 
-RELATIVE DATE CONVERSIONS (use these exact dates):
-- "بعد أسبوعين" / "after 2 weeks" = ${in14days}
-- "بعد 3 أسابيع" / "after 3 weeks" = ${in21days}
-- "بعد شهر" / "after a month" = ${in30days}
+══ STEP 1 — PARSE THE DESCRIPTION ══
+Extract from what the student wrote:
+- All subjects mentioned (with session count and duration if given)
+- Exam/deadline date (relative or absolute)
+- Which subjects are "weak" (keywords: ضعيف، صعبة، مش فاهم، weak، struggling، difficult)
+- Default duration_minutes = 60 if not mentioned
 
-Respond ONLY with valid compact JSON (no markdown fences):
+══ STEP 2 — CONVERT RELATIVE DATES ══
+Use these exact absolute dates:
+- "بعد أسبوع"      / "in 1 week"    = ${d7}
+- "بعد أسبوعين"    / "in 2 weeks"   = ${d14}
+- "بعد 3 أسابيع"   / "in 3 weeks"   = ${d21}
+- "بعد شهر"        / "in 1 month"   = ${d30}
+- "بعد شهرين"      / "in 2 months"  = ${d60}
+- "بعد 3 شهور"     / "in 3 months"  = ${d90}
+- No date mentioned                  = ${d30}
+- For other values: today + (N × 7) for weeks, today + (N × 30) for months
+
+══ STEP 3 — CALCULATE tasks_per_day ══
+available_days = (exam_date - today) - 3   ← leave 3-day buffer before exam
+total_sessions = sum of ALL sessions across ALL subjects
+tasks_per_day  = ceil(total_sessions / available_days)
+CLAMP: if tasks_per_day < 1 → 1 | if tasks_per_day > 3 → 3
+
+══ STEP 4 — APPLY WEAK SUBJECT RULES ══
+For each is_weak = true subject:
+- duration_minutes += 15 (extra time per session)
+- set include_review = true
+
+══ OUTPUT — ONLY valid compact JSON, NO markdown, NO explanation ══
 {
-  "reply": "<2-sentence motivational reply in student's language>",
+  "reply": "<2 warm sentences in the student's language summarizing the plan>",
   "exam_date": "yyyy-MM-dd",
-  "plan_title": "<short concise plan name>",
+  "plan_title": "<short Arabic or English plan name>",
   "subjects": [
-    {
-      "name": "<subject name>",
-      "sessions": <number>,
-      "duration_minutes": <45-120>,
-      "is_weak": <true if student mentioned weakness>,
-      "title_prefix": "<very short label, e.g. 'كيناماتيكس' or 'Kinematics'>"
-    }
+    {"name":"<full name>","sessions":<N>,"duration_minutes":<45-120>,"is_weak":<bool>,"title_prefix":"<short Arabic/English label>"}
   ],
-  "tasks_per_day": <1-3, = ceil(total_sessions / available_days), max 3>,
-  "include_review": <true if exam < 3 weeks OR any is_weak = true>
+  "tasks_per_day": <1|2|3>,
+  "include_review": <true|false>
 }
 
-RULES:
-- Parse ALL subjects and session counts mentioned
-- For weak subjects: duration_minutes += 15, is_weak = true
-- If no exam date → use ${in30days}
-- Respond in the SAME language as the student (Arabic or English)`
+══ FEW-SHOT EXAMPLE 1 (Arabic) ══
+Input: "عندي امتحان فيزياء بعد 3 أسابيع، كيناماتيكس 5 سيشن، ديناميكس 8 سيشن، وأنا ضعيف في الثيرمو 4 سيشن"
+
+Reasoning:
+- exam_date = ${d21} (3 أسابيع من النهارده)
+- available_days = 21 - 3 = 18 يوم
+- total = 5 + 8 + 4 = 17 سيشن
+- tasks_per_day = ceil(17/18) = 1
+- ثيرمو is_weak=true → duration 60+15=75 دقيقة
+
+Output:
+{"reply":"ممتاز! بنيتلك خطة فيزياء لـ 3 أسابيع — الثيرمو هياخد وقت أطول ومعاه مراجعات. روح على بركة الله 💪","exam_date":"${d21}","plan_title":"خطة الفيزياء","subjects":[{"name":"Kinematics","sessions":5,"duration_minutes":60,"is_weak":false,"title_prefix":"كيناماتيكس"},{"name":"Dynamics","sessions":8,"duration_minutes":60,"is_weak":false,"title_prefix":"ديناميكس"},{"name":"Thermodynamics","sessions":4,"duration_minutes":75,"is_weak":true,"title_prefix":"ثيرمو"}],"tasks_per_day":1,"include_review":true}
+
+══ FEW-SHOT EXAMPLE 2 (English) ══
+Input: "Math exam in 2 weeks: Calculus 6 sessions 60min, Statistics 4 sessions 45min, struggling with Linear Algebra 5 sessions"
+
+Reasoning:
+- exam_date = ${d14} (2 weeks)
+- available_days = 14 - 3 = 11 days
+- total = 6 + 4 + 5 = 15 sessions
+- tasks_per_day = ceil(15/11) = 2
+- Linear Algebra is_weak=true → duration 60+15=75 min
+
+Output:
+{"reply":"Great! 15 sessions over 2 weeks — 2 per day. Linear Algebra gets extra time and review sessions. You've got this! 🎯","exam_date":"${d14}","plan_title":"Math Exam Prep","subjects":[{"name":"Calculus","sessions":6,"duration_minutes":60,"is_weak":false,"title_prefix":"Calculus"},{"name":"Statistics","sessions":4,"duration_minutes":45,"is_weak":false,"title_prefix":"Stats"},{"name":"Linear Algebra","sessions":5,"duration_minutes":75,"is_weak":true,"title_prefix":"Lin Algebra"}],"tasks_per_day":2,"include_review":true}
+
+══ FEW-SHOT EXAMPLE 3 (Arabic, many subjects) ══
+Input: "عندي امتحان كيمياء بعد شهر، عضوي 10 سيشن، غير عضوي 7 سيشن، فيزيائية 4 سيشن وهي صعبة عليا"
+
+Reasoning:
+- exam_date = ${d30} (شهر)
+- available_days = 30 - 3 = 27 يوم
+- total = 10 + 7 + 4 = 21 سيشن
+- tasks_per_day = ceil(21/27) = 1
+- فيزيائية is_weak=true → duration 60+15=75
+
+Output:
+{"reply":"تمام! 21 سيشن كيمياء على 4 أسابيع — الكيمياء الفيزيائية هتاخد وقت زيادة ومراجعات. انت تقدر 🔥","exam_date":"${d30}","plan_title":"خطة الكيمياء","subjects":[{"name":"Organic Chemistry","sessions":10,"duration_minutes":60,"is_weak":false,"title_prefix":"عضوي"},{"name":"Inorganic Chemistry","sessions":7,"duration_minutes":60,"is_weak":false,"title_prefix":"غير عضوي"},{"name":"Physical Chemistry","sessions":4,"duration_minutes":75,"is_weak":true,"title_prefix":"فيزيائية"}],"tasks_per_day":1,"include_review":true}
+
+NOW process the student input below and output ONLY the JSON:`
 
   let raw: string
   try {
     raw = await generateAIResponse(
       [{ role: 'system', content: systemPrompt }, { role: 'user', content: description }],
-      { maxTokens: 700, temperature: 0.3 },
+      { maxTokens: 800, temperature: 0.1 },   // low temp = deterministic JSON
     )
   } catch {
     return { success: false, reply: 'حصل خطأ في الاتصال بالذكاء الاصطناعي. حاول تاني.', tasksCreated: 0, examDate: null }
@@ -118,11 +176,20 @@ RULES:
     plan = JSON.parse(match[0])
     if (!plan.subjects?.length) throw new Error('no subjects')
   } catch {
-    return { success: false, reply: 'مش قادر أحلل الوصف. حاول تكتب تفاصيل أكتر، مثل: "عندي امتحان فيزياء بعد 3 أسابيع، كيناماتيكس 5 سيشن، ديناميكس 8 سيشن".', tasksCreated: 0, examDate: null }
+    return {
+      success: false,
+      reply: 'مش قادر أحلل الوصف دا. حاول تكتب زي: "امتحان فيزياء بعد 3 أسابيع، كيناماتيكس 5 سيشن 60 دقيقة، ديناميكس 8 سيشن".',
+      tasksCreated: 0, examDate: null,
+    }
   }
 
-  const examDate   = plan.exam_date ?? in30days
-  const perDay     = Math.max(1, Math.min(3, plan.tasks_per_day ?? 2))
+  const examDate = plan.exam_date ?? format(addDays(new Date(), 30), 'yyyy-MM-dd')
+
+  // ── Server-side recalculate tasks_per_day (don't trust AI math blindly) ──────
+  const totalSessions   = (plan.subjects ?? []).reduce((s, x) => s + (x.sessions ?? 0), 0)
+  const availableDays   = Math.max(3, differenceInCalendarDays(parseISO(examDate), new Date()) - 3)
+  const correctPerDay   = Math.max(1, Math.min(3, Math.ceil(totalSessions / availableDays)))
+  const perDay          = correctPerDay
   const subjects   = plan.subjects ?? []
 
   // ── 1. Deactivate old goals, create new one ─────────────────────────────────
