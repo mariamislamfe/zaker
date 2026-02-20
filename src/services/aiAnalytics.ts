@@ -22,13 +22,16 @@ export interface SubjectReadiness {
 }
 
 export interface ReadinessReport {
-  overallPct:      number
-  examDate:        string | null
-  daysLeft:        number | null
-  subjects:        SubjectReadiness[]
-  warnings:        string[]
-  recommendations: string[]
-  aiSummary:       string
+  overallPct:             number
+  examDate:               string | null
+  daysLeft:               number | null
+  subjects:               SubjectReadiness[]
+  warnings:               string[]
+  recommendations:        string[]
+  aiSummary:              string
+  completionProbability:  number
+  riskLevel:              'low' | 'medium' | 'high' | 'critical'
+  riskFactors:            string[]
 }
 
 export interface BehaviorInsight {
@@ -130,35 +133,79 @@ export async function getReadinessReport(userId: string): Promise<ReadinessRepor
   const stale = subjects.filter(s => s.daysSinceStudied !== null && s.daysSinceStudied >= 5 && s.coveragePct < 100)
   if (stale.length > 0) recs.push(`اضف مراجعة لـ: ${stale.map(s => s.name).join('، ')}`)
 
-  // AI narrative summary
-  let aiSummary = ''
-  try {
-    const contextBlock = subjects.map(s =>
-      `${s.name}: ${s.completedSessions}/${s.totalSessions} (${s.coveragePct}%) — ${s.status}${s.daysSinceStudied && s.daysSinceStudied >= 5 ? ` — آخر مراجعة ${s.daysSinceStudied} أيام` : ''}`
-    ).join('\n')
+  // ── AI-assisted risk analysis (Modular AI Architecture) ──────────────────────
+  // AI reasons + suggests · server validates · deterministic output guaranteed
+  const fallbackProb = Math.min(100, Math.round(
+    overallPct * 0.6 + (daysLeft !== null && daysLeft > 14 ? 15 : 0) + (warnings.length === 0 ? 10 : 0)
+  ))
+  const fallbackLevel: 'low' | 'medium' | 'high' | 'critical' =
+    fallbackProb >= 70 ? 'low' : fallbackProb >= 45 ? 'medium' : fallbackProb >= 25 ? 'high' : 'critical'
 
-    const raw = await generateAIResponse([{
-      role: 'user',
-      content: `أنت مدرب مذاكرة ذكي. اكتب تقييماً صريحاً ومحفزاً في جملتين باللغة العربية لهذا الطالب:
-
-الامتحان: ${examDate ?? 'غير محدد'} — متبقي: ${daysLeft ?? '?'} يوم
-التغطية الإجمالية: ${overallPct}%
-
-المواد:
-${contextBlock}
-
-التحذيرات: ${warnings.join(' | ') || 'لا يوجد'}
-
-كن صريحاً وواقعياً لكن محفزاً. باللغة العربية فقط. جملتان فقط.`,
-    }], { maxTokens: 200, temperature: 0.6 })
-    aiSummary = raw
-  } catch {
-    aiSummary = overallPct >= 70
+  let aiAnalysis = {
+    summary:               overallPct >= 70
       ? 'أنت في الطريق الصح! استمر في الإيقاع ده وهتكون جاهز للامتحان.'
-      : 'محتاج تضغط أكتر. ركز على المواد الضعيفة وزود ساعات المذاكرة يومياً.'
+      : 'محتاج تضغط أكتر. ركز على المواد الضعيفة وزود ساعات المذاكرة يومياً.',
+    completionProbability: fallbackProb,
+    riskLevel:             fallbackLevel,
+    riskFactors:           warnings.slice(0, 3) as string[],
   }
 
-  return { overallPct, examDate, daysLeft, subjects, warnings, recommendations: recs, aiSummary }
+  try {
+    const contextBlock = subjects.map(s =>
+      `${s.name}: ${s.completedSessions}/${s.totalSessions} (${s.coveragePct}%) — ${s.status}${s.daysSinceStudied !== null && s.daysSinceStudied >= 5 ? ` — last studied ${s.daysSinceStudied}d ago` : ''}`
+    ).join('\n')
+
+    const raw = await generateAIResponse([
+      {
+        role: 'system',
+        content: `You are Zaker AI — an academic risk assessment engine for Arab university students.
+YOUR ROLE: Analyze student progress data → predict exam readiness → return structured JSON.
+YOU ARE NOT A CHATBOT. Return ONLY valid JSON. No markdown. No explanation outside JSON.
+
+OUTPUT SCHEMA (return ONLY this JSON, nothing else):
+{
+  "summary": "<2 sentences in Arabic — honest and motivating>",
+  "completionProbability": <integer 0-100>,
+  "riskLevel": "<low|medium|high|critical>",
+  "riskFactors": ["<Arabic risk factor>", "<Arabic risk factor>"]
+}
+
+SCORING RULES:
+- completionProbability = coverage_pct×0.4 + days_buffer×0.3 + consistency×0.3  (range 0-100)
+- low = 70-100 · medium = 45-69 · high = 25-44 · critical = 0-24
+- riskFactors: max 3 items, specific + actionable, Arabic only
+- summary: Arabic only, 2 sentences, honest but motivating`,
+      },
+      {
+        role: 'user',
+        content: `Exam: ${examDate ?? 'unknown'} — Days left: ${daysLeft ?? '?'}
+Overall coverage: ${overallPct}%
+Subjects:
+${contextBlock}
+Warnings: ${warnings.join(' | ') || 'none'}`,
+      },
+    ], { maxTokens: 250, temperature: 0.2 })
+
+    const match = raw.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
+    if (match) {
+      const p = JSON.parse(match[0]) as Record<string, unknown>
+      const VALID = new Set(['low', 'medium', 'high', 'critical'])
+      aiAnalysis = {
+        summary:               typeof p.summary === 'string'               ? p.summary                                                        : aiAnalysis.summary,
+        completionProbability: typeof p.completionProbability === 'number' ? Math.min(100, Math.max(0, Math.round(p.completionProbability)))   : aiAnalysis.completionProbability,
+        riskLevel:             typeof p.riskLevel === 'string' && VALID.has(p.riskLevel) ? (p.riskLevel as 'low'|'medium'|'high'|'critical')  : aiAnalysis.riskLevel,
+        riskFactors:           Array.isArray(p.riskFactors)                ? (p.riskFactors as string[]).slice(0, 3)                           : aiAnalysis.riskFactors,
+      }
+    }
+  } catch { /* server-side fallback already set above */ }
+
+  return {
+    overallPct, examDate, daysLeft, subjects, warnings, recommendations: recs,
+    aiSummary:              aiAnalysis.summary,
+    completionProbability:  aiAnalysis.completionProbability,
+    riskLevel:              aiAnalysis.riskLevel,
+    riskFactors:            aiAnalysis.riskFactors,
+  }
 }
 
 // ─── Behavioral Insights ──────────────────────────────────────────────────────
@@ -247,21 +294,27 @@ export async function getBehaviorInsights(userId: string): Promise<BehaviorData>
   ]
   if (sleepLine) insights.push({ label: 'تأثير النوم', value: sleepLine, icon: '🌙', color: 'blue' })
 
-  // AI narrative
+  // AI narrative (Behavioral Intelligence endpoint)
   let aiNarrative = ''
   try {
-    const raw = await generateAIResponse([{
-      role: 'user',
-      content: `أنت محلل سلوك مذاكرة. في جملتين باللغة العربية، أعطِ نصيحة مخصصة بناءً على هذه البيانات:
+    const raw = await generateAIResponse([
+      {
+        role: 'system',
+        content: `You are Zaker AI — a behavioral study coach for Arab university students.
+YOUR ROLE: Analyze 30-day study behavior data → identify patterns → deliver concise personalized advice.
+YOU ARE NOT A CHATBOT. Return plain Arabic text only. 2 sentences max. No JSON. No markdown.`,
+      },
+      {
+        role: 'user',
+        content: `30-day completion rate: ${avgCompletionRate}%
+Best study day: ${DAY_AR[bestDayIdx]} (${Math.round(bestRate * 100)}% completion)
+Worst study day: ${DAY_AR[worstDayIdx]} (${Math.round(worstRate * 100)}% completion)
+Current streak: ${streak} consecutive days
+${sleepLine ? `Sleep insight: ${sleepLine}` : ''}
 
-معدل إنجاز 30 يوم: ${avgCompletionRate}%
-أحسن يوم: ${DAY_AR[bestDayIdx]} (${Math.round(bestRate * 100)}%)
-أضعف يوم: ${DAY_AR[worstDayIdx]} (${Math.round(worstRate * 100)}%)
-أيام متواصلة: ${streak}
-${sleepLine ? `ملاحظة نوم: ${sleepLine}` : ''}
-
-نصيحة عملية ومحفزة. باللغة العربية فقط. جملتان.`,
-    }], { maxTokens: 150, temperature: 0.7 })
+Give 2 sentences of specific, actionable advice in Arabic based on this data.`,
+      },
+    ], { maxTokens: 150, temperature: 0.6 })
     aiNarrative = raw
   } catch {
     aiNarrative = `معدل إنجازك ${avgCompletionRate}%. جدول أصعب مواضيعك يوم ${DAY_AR[bestDayIdx]} لأنه أحسن أيامك.`

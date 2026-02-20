@@ -78,6 +78,56 @@ export function useStudyPlan(date?: string) {
     await supabase.from('plan_tasks').update({ status: 'pending', completed_at: null }).eq('id', taskId)
   }, [])
 
+  // ── Add a task (create plan if none exists) ───────────────────────────────
+  const addTask = useCallback(async (
+    title: string,
+    durationMinutes: number,
+    subjectName?: string,
+  ) => {
+    if (!user) return
+    let planId = plan?.id
+
+    if (!planId) {
+      const { data: newPlan } = await supabase.from('study_plans').insert({
+        user_id:       user.id,
+        title:         'تاسكات يومية',
+        plan_type:     'daily',
+        start_date:    targetDate,
+        end_date:      null,
+        status:        'active',
+        ai_generated:  false,
+        metadata:      {},
+      }).select().single()
+      if (newPlan) {
+        setPlan(newPlan as StudyPlan)
+        planId = (newPlan as StudyPlan).id
+      }
+    }
+
+    if (!planId) return
+
+    const { data: newTask } = await supabase.from('plan_tasks').insert({
+      plan_id:          planId,
+      user_id:          user.id,
+      title,
+      subject_name:     subjectName ?? null,
+      subject_id:       null,
+      scheduled_date:   targetDate,
+      duration_minutes: durationMinutes,
+      status:           'pending',
+      priority:         1,
+      order_index:      tasks.length,
+    }).select().single()
+
+    if (newTask) setTasks(prev => [...prev, newTask as PlanTask])
+  }, [user, plan, tasks, targetDate])
+
+  // ── Delete a task ─────────────────────────────────────────────────────────
+  const deleteTask = useCallback(async (taskId: string) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+    await supabase.from('plan_tasks').delete().eq('id', taskId)
+  }, [])
+
   // ── Generate tomorrow's plan via AI ───────────────────────────────────────
   const generateTomorrowPlan = useCallback(async () => {
     if (!user) return
@@ -112,7 +162,7 @@ export function useStudyPlan(date?: string) {
   return {
     plan, tasks, loading, generating, error,
     completedCount, totalCount, plannedMinutes, doneMinutes, progressPct,
-    completeTask, skipTask, resetTask,
+    completeTask, skipTask, resetTask, addTask, deleteTask,
     generateTomorrowPlan, rescheduleOverdue,
     refetch: fetchPlan,
   }
