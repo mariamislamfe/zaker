@@ -327,6 +327,105 @@ export type Database = {
         }
         Relationships: []
       }
+      user_goals: {
+        Row: {
+          id: string; user_id: string; title: string; description: string | null
+          target_date: string | null; hours_per_day: number; subjects: Json
+          is_active: boolean; created_at: string
+        }
+        Insert: {
+          id?: string; user_id: string; title: string; description?: string | null
+          target_date?: string | null; hours_per_day?: number; subjects?: Json
+          is_active?: boolean; created_at?: string
+        }
+        Update: {
+          id?: string; user_id?: string; title?: string; description?: string | null
+          target_date?: string | null; hours_per_day?: number; subjects?: Json
+          is_active?: boolean; created_at?: string
+        }
+        Relationships: []
+      }
+      study_plans: {
+        Row: {
+          id: string; user_id: string; goal_id: string | null; title: string
+          plan_type: string; start_date: string; end_date: string | null
+          status: string; ai_generated: boolean; metadata: Json; created_at: string
+        }
+        Insert: {
+          id?: string; user_id: string; goal_id?: string | null; title: string
+          plan_type?: string; start_date: string; end_date?: string | null
+          status?: string; ai_generated?: boolean; metadata?: Json; created_at?: string
+        }
+        Update: {
+          id?: string; user_id?: string; goal_id?: string | null; title?: string
+          plan_type?: string; start_date?: string; end_date?: string | null
+          status?: string; ai_generated?: boolean; metadata?: Json; created_at?: string
+        }
+        Relationships: []
+      }
+      plan_tasks: {
+        Row: {
+          id: string; plan_id: string; user_id: string; subject_id: string | null
+          subject_name: string | null; title: string; description: string | null
+          scheduled_date: string; scheduled_start_time: string | null
+          duration_minutes: number; status: string; actual_duration_minutes: number | null
+          priority: number; order_index: number; completed_at: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; plan_id: string; user_id: string; subject_id?: string | null
+          subject_name?: string | null; title: string; description?: string | null
+          scheduled_date: string; scheduled_start_time?: string | null
+          duration_minutes?: number; status?: string; actual_duration_minutes?: number | null
+          priority?: number; order_index?: number; completed_at?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; plan_id?: string; user_id?: string; subject_id?: string | null
+          subject_name?: string | null; title?: string; description?: string | null
+          scheduled_date?: string; scheduled_start_time?: string | null
+          duration_minutes?: number; status?: string; actual_duration_minutes?: number | null
+          priority?: number; order_index?: number; completed_at?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
+      daily_reports: {
+        Row: {
+          id: string; user_id: string; report_date: string; planned_minutes: number
+          actual_minutes: number; adherence_score: number; productivity_score: number
+          focus_score: number; tasks_planned: number; tasks_completed: number
+          insights: Json; created_at: string
+        }
+        Insert: {
+          id?: string; user_id: string; report_date: string; planned_minutes?: number
+          actual_minutes?: number; adherence_score?: number; productivity_score?: number
+          focus_score?: number; tasks_planned?: number; tasks_completed?: number
+          insights?: Json; created_at?: string
+        }
+        Update: {
+          id?: string; user_id?: string; report_date?: string; planned_minutes?: number
+          actual_minutes?: number; adherence_score?: number; productivity_score?: number
+          focus_score?: number; tasks_planned?: number; tasks_completed?: number
+          insights?: Json; created_at?: string
+        }
+        Relationships: []
+      }
+      ai_insights: {
+        Row: {
+          id: string; user_id: string; insight_type: string; title: string
+          content: string; priority: number; is_read: boolean; metadata: Json
+          expires_at: string | null; created_at: string
+        }
+        Insert: {
+          id?: string; user_id: string; insight_type: string; title: string
+          content: string; priority?: number; is_read?: boolean; metadata?: Json
+          expires_at?: string | null; created_at?: string
+        }
+        Update: {
+          id?: string; user_id?: string; insight_type?: string; title?: string
+          content?: string; priority?: number; is_read?: boolean; metadata?: Json
+          expires_at?: string | null; created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

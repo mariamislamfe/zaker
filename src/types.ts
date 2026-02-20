@@ -187,6 +187,81 @@ export interface PracticePassage {
   grade: number
 }
 
+// ─── AI / Planner ─────────────────────────────────────────────────────────────
+
+export interface UserGoal {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  target_date: string | null   // 'yyyy-MM-dd'
+  hours_per_day: number
+  subjects: string[]           // array of subject_ids (stored as jsonb)
+  is_active: boolean
+  created_at: string
+}
+
+export interface StudyPlan {
+  id: string
+  user_id: string
+  goal_id: string | null
+  title: string
+  plan_type: 'daily' | 'weekly' | 'custom'
+  start_date: string
+  end_date: string | null
+  status: 'active' | 'completed' | 'abandoned'
+  ai_generated: boolean
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface PlanTask {
+  id: string
+  plan_id: string
+  user_id: string
+  subject_id: string | null
+  subject_name: string | null
+  title: string
+  description: string | null
+  scheduled_date: string          // 'yyyy-MM-dd'
+  scheduled_start_time: string | null  // 'HH:mm'
+  duration_minutes: number
+  status: 'pending' | 'completed' | 'skipped' | 'in_progress'
+  actual_duration_minutes: number | null
+  priority: number                // 1=low 2=medium 3=high
+  order_index: number
+  completed_at: string | null
+  created_at: string
+}
+
+export interface DailyReport {
+  id: string
+  user_id: string
+  report_date: string
+  planned_minutes: number
+  actual_minutes: number
+  adherence_score: number
+  productivity_score: number
+  focus_score: number
+  tasks_planned: number
+  tasks_completed: number
+  insights: string[]
+  created_at: string
+}
+
+export interface AIInsight {
+  id: string
+  user_id: string
+  insight_type: 'recommendation' | 'warning' | 'achievement' | 'pattern'
+  title: string
+  content: string
+  priority: number
+  is_read: boolean
+  metadata: Record<string, unknown>
+  expires_at: string | null
+  created_at: string
+}
+
 // ─── UI ───────────────────────────────────────────────────────────────────────
 
 export type Theme = 'light' | 'dark'
