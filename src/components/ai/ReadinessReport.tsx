@@ -22,7 +22,7 @@ function CircularScore({ pct }: { pct: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-2xl font-bold text-zinc-800 dark:text-zinc-100">{pct}%</span>
-        <span className="text-[10px] text-zinc-400">جاهزية</span>
+        <span className="text-[10px] text-zinc-400">Readiness</span>
       </div>
     </div>
   )
@@ -31,10 +31,10 @@ function CircularScore({ pct }: { pct: number }) {
 // ─── Subject row ──────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<SubjectReadiness['status'], { label: string; icon: React.ReactNode; barColor: string }> = {
-  done:     { label: 'مكتمل',   icon: <CheckCircle2 size={13} className="text-emerald-500" />,  barColor: 'bg-emerald-500' },
-  on_track: { label: 'منتظم',   icon: <TrendingUp   size={13} className="text-primary-500" />,  barColor: 'bg-primary-500' },
-  behind:   { label: 'متأخر',   icon: <Clock        size={13} className="text-amber-500" />,     barColor: 'bg-amber-400'   },
-  danger:   { label: 'خطر',     icon: <AlertTriangle size={13} className="text-red-500" />,     barColor: 'bg-red-500'     },
+  done:     { label: 'Complete',  icon: <CheckCircle2 size={13} className="text-emerald-500" />,  barColor: 'bg-emerald-500' },
+  on_track: { label: 'On track',  icon: <TrendingUp   size={13} className="text-primary-500" />,  barColor: 'bg-primary-500' },
+  behind:   { label: 'Behind',    icon: <Clock        size={13} className="text-amber-500" />,     barColor: 'bg-amber-400'   },
+  danger:   { label: 'Danger',    icon: <AlertTriangle size={13} className="text-red-500" />,     barColor: 'bg-red-500'     },
 }
 
 function SubjectRow({ s }: { s: SubjectReadiness }) {
@@ -58,7 +58,7 @@ function SubjectRow({ s }: { s: SubjectReadiness }) {
         />
       </div>
       {s.daysSinceStudied !== null && s.daysSinceStudied >= 5 && s.coveragePct < 100 && (
-        <p className="text-[10px] text-amber-500">آخر مراجعة: منذ {s.daysSinceStudied} أيام</p>
+        <p className="text-[10px] text-amber-500">Last reviewed: {s.daysSinceStudied} days ago</p>
       )}
     </div>
   )
@@ -67,10 +67,10 @@ function SubjectRow({ s }: { s: SubjectReadiness }) {
 // ─── Risk meta ───────────────────────────────────────────────────────────────
 
 const RISK_META = {
-  low:      { label: 'خطر منخفض', text: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/30',   border: 'border-emerald-200 dark:border-emerald-800' },
-  medium:   { label: 'خطر متوسط', text: 'text-amber-700 dark:text-amber-300',     bg: 'bg-amber-50 dark:bg-amber-950/30',       border: 'border-amber-200 dark:border-amber-800'   },
-  high:     { label: 'خطر عالي',  text: 'text-orange-700 dark:text-orange-300',   bg: 'bg-orange-50 dark:bg-orange-950/30',     border: 'border-orange-200 dark:border-orange-800' },
-  critical: { label: 'خطر حرج',   text: 'text-red-700 dark:text-red-300',         bg: 'bg-red-50 dark:bg-red-950/30',           border: 'border-red-200 dark:border-red-800'       },
+  low:      { label: 'Low Risk',      text: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/30',   border: 'border-emerald-200 dark:border-emerald-800' },
+  medium:   { label: 'Medium Risk',   text: 'text-amber-700 dark:text-amber-300',     bg: 'bg-amber-50 dark:bg-amber-950/30',       border: 'border-amber-200 dark:border-amber-800'   },
+  high:     { label: 'High Risk',     text: 'text-orange-700 dark:text-orange-300',   bg: 'bg-orange-50 dark:bg-orange-950/30',     border: 'border-orange-200 dark:border-orange-800' },
+  critical: { label: 'Critical Risk', text: 'text-red-700 dark:text-red-300',         bg: 'bg-red-50 dark:bg-red-950/30',           border: 'border-red-200 dark:border-red-800'       },
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
@@ -99,24 +99,24 @@ export function ReadinessReport() {
       <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden shadow-sm">
         <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-700">
           <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2">
-            <TrendingUp size={16} className="text-primary-500" /> تقرير الجاهزية للامتحان
+            <TrendingUp size={16} className="text-primary-500" /> Exam Readiness Report
           </h3>
-          <p className="text-xs text-zinc-400 mt-0.5">K2-Think يحلل خطتك ويقيّم مستوى جاهزيتك</p>
+          <p className="text-xs text-zinc-400 mt-0.5">K2-Think analyzes your plan and evaluates your readiness level</p>
         </div>
         <div className="p-8 flex flex-col items-center gap-4 text-center">
           <div className="w-16 h-16 rounded-2xl bg-primary-50 dark:bg-primary-950/40 flex items-center justify-center">
             <BookOpen size={28} className="text-primary-500" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">حلّل جاهزيتك للامتحان</p>
-            <p className="text-xs text-zinc-400 mt-1">سيراجع الذكاء الاصطناعي تغطيتك لكل مادة وإيقاع مذاكرتك</p>
+            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">Analyze your exam readiness</p>
+            <p className="text-xs text-zinc-400 mt-1">AI will review your subject coverage and study pace</p>
           </div>
           <button
             onClick={fetchReport}
             className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-colors"
           >
             <Sparkles size={14} />
-            حلّل خطتي الآن
+            Analyze My Plan
           </button>
         </div>
       </div>
@@ -128,7 +128,7 @@ export function ReadinessReport() {
     return (
       <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-8 flex flex-col items-center gap-3 shadow-sm">
         <Loader2 size={28} className="text-primary-500 animate-spin" />
-        <p className="text-sm text-zinc-500">K2-Think بيحلل بياناتك...</p>
+        <p className="text-sm text-zinc-500">K2-Think analyzing your data...</p>
       </div>
     )
   }
@@ -136,8 +136,8 @@ export function ReadinessReport() {
   if (!report) return null
 
   const daysText = report.daysLeft !== null
-    ? (report.daysLeft <= 0 ? 'الامتحان اليوم!' : `${report.daysLeft} يوم على الامتحان`)
-    : 'لم يُحدد تاريخ'
+    ? (report.daysLeft <= 0 ? 'Exam is today!' : `${report.daysLeft} days until exam`)
+    : 'No date set'
 
   return (
     <div className="bg-white dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-hidden shadow-sm">
@@ -145,7 +145,7 @@ export function ReadinessReport() {
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-100 dark:border-zinc-700">
         <div>
-          <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-100">تقرير الجاهزية</h3>
+          <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-100">Readiness Report</h3>
           <p className="text-xs text-zinc-400">{daysText}</p>
         </div>
         <button onClick={fetchReport} className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-600 transition-colors">
@@ -177,7 +177,7 @@ export function ReadinessReport() {
               <p className={`text-3xl font-black leading-none mb-0.5 ${meta.text}`}>
                 {report.completionProbability}%
               </p>
-              <p className={`text-xs opacity-60 mb-2 ${meta.text}`}>احتمال إنهاء الخطة قبل الامتحان</p>
+              <p className={`text-xs opacity-60 mb-2 ${meta.text}`}>probability of completing the plan before the exam</p>
               {report.riskFactors.length > 0 && (
                 <ul className="space-y-0.5">
                   {report.riskFactors.map((f, i) => (
@@ -194,7 +194,7 @@ export function ReadinessReport() {
         {/* Subjects */}
         {report.subjects.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">تغطية المواد</p>
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Subject Coverage</p>
             {report.subjects.map(s => <SubjectRow key={s.name} s={s} />)}
           </div>
         )}
@@ -214,7 +214,7 @@ export function ReadinessReport() {
         {/* Recommendations */}
         {report.recommendations.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">توصيات</p>
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Recommendations</p>
             {report.recommendations.map((r, i) => (
               <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-xl bg-primary-50 dark:bg-primary-950/30 border border-primary-100 dark:border-primary-900">
                 <CheckCircle2 size={13} className="text-primary-500 shrink-0 mt-0.5" />

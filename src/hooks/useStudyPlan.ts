@@ -9,11 +9,12 @@ export function useStudyPlan(date?: string) {
   const { user } = useAuth()
   const targetDate = date ?? format(new Date(), 'yyyy-MM-dd')
 
-  const [plan,    setPlan]    = useState<StudyPlan | null>(null)
-  const [tasks,   setTasks]   = useState<PlanTask[]>([])
-  const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
+  const [plan,         setPlan]         = useState<StudyPlan | null>(null)
+  const [tasks,        setTasks]        = useState<PlanTask[]>([])
+  const [overdueTasks, setOverdueTasks] = useState<PlanTask[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [generating,   setGenerating]   = useState(false)
+  const [error,        setError]        = useState<string | null>(null)
 
   // ── Fetch plan + tasks for targetDate ─────────────────────────────────────
   const fetchPlan = useCallback(async () => {
@@ -35,6 +36,7 @@ export function useStudyPlan(date?: string) {
     const currentPlan = planData as StudyPlan | null
     setPlan(currentPlan)
 
+    // Fetch today's tasks
     if (currentPlan) {
       const { data: taskData } = await supabase
         .from('plan_tasks')
@@ -47,6 +49,19 @@ export function useStudyPlan(date?: string) {
       setTasks([])
     }
 
+    // Fetch overdue pending tasks — always relative to TODAY (never shows today's tasks as overdue)
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const { data: overdueData } = await supabase
+      .from('plan_tasks')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'pending')
+      .lt('scheduled_date', today)
+      .neq('scheduled_date', '9999-12-31')
+      .order('scheduled_date', { ascending: false })
+      .order('order_index',    { ascending: true })
+    setOverdueTasks((overdueData ?? []) as PlanTask[])
+
     setLoading(false)
   }, [user, targetDate])
 
@@ -54,11 +69,9 @@ export function useStudyPlan(date?: string) {
 
   // ── Complete a task (optimistic) ──────────────────────────────────────────
   const completeTask = useCallback(async (taskId: string, actualMinutes?: number) => {
-    setTasks(prev => prev.map(t =>
-      t.id === taskId
-        ? { ...t, status: 'completed', completed_at: new Date().toISOString(), actual_duration_minutes: actualMinutes ?? t.duration_minutes }
-        : t,
-    ))
+    const patch = { status: 'completed' as const, completed_at: new Date().toISOString(), actual_duration_minutes: actualMinutes }
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch, actual_duration_minutes: actualMinutes ?? t.duration_minutes } : t))
+    setOverdueTasks(prev => prev.filter(t => t.id !== taskId))
     await supabase.from('plan_tasks').update({
       status: 'completed',
       completed_at: new Date().toISOString(),
@@ -69,6 +82,7 @@ export function useStudyPlan(date?: string) {
   // ── Skip a task (optimistic) ──────────────────────────────────────────────
   const skipTask = useCallback(async (taskId: string) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'skipped' } : t))
+    setOverdueTasks(prev => prev.filter(t => t.id !== taskId))
     await supabase.from('plan_tasks').update({ status: 'skipped' }).eq('id', taskId)
   }, [])
 
@@ -90,7 +104,7 @@ export function useStudyPlan(date?: string) {
     if (!planId) {
       const { data: newPlan } = await supabase.from('study_plans').insert({
         user_id:       user.id,
-        title:         'تاسكات يومية',
+        title:         'Daily Tasks',
         plan_type:     'daily',
         start_date:    targetDate,
         end_date:      null,
@@ -125,6 +139,7 @@ export function useStudyPlan(date?: string) {
   // ── Delete a task ─────────────────────────────────────────────────────────
   const deleteTask = useCallback(async (taskId: string) => {
     setTasks(prev => prev.filter(t => t.id !== taskId))
+    setOverdueTasks(prev => prev.filter(t => t.id !== taskId))
     await supabase.from('plan_tasks').delete().eq('id', taskId)
   }, [])
 
@@ -160,7 +175,7 @@ export function useStudyPlan(date?: string) {
   const progressPct    = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return {
-    plan, tasks, loading, generating, error,
+    plan, tasks, overdueTasks, loading, generating, error,
     completedCount, totalCount, plannedMinutes, doneMinutes, progressPct,
     completeTask, skipTask, resetTask, addTask, deleteTask,
     generateTomorrowPlan, rescheduleOverdue,

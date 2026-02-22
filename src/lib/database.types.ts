@@ -447,6 +447,21 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_messages: {
+        Row: {
+          id: string; created_at: string; title: string; content: string
+          target_user_id: string | null; is_active: boolean; created_by: string | null
+        }
+        Insert: {
+          id?: string; created_at?: string; title: string; content: string
+          target_user_id?: string | null; is_active?: boolean; created_by?: string | null
+        }
+        Update: {
+          id?: string; created_at?: string; title?: string; content?: string
+          target_user_id?: string | null; is_active?: boolean; created_by?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

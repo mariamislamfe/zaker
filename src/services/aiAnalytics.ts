@@ -57,9 +57,9 @@ export interface SmartAlert {
   message: string
 }
 
-// ─── Arabic day names ─────────────────────────────────────────────────────────
+// ─── Day names ────────────────────────────────────────────────────────────────
 
-const DAY_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
+const DAY_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // ─── Readiness Report ─────────────────────────────────────────────────────────
 
@@ -119,19 +119,19 @@ export async function getReadinessReport(userId: string): Promise<ReadinessRepor
   // Warnings
   const warnings: string[] = []
   subjects.filter(s => s.status === 'danger').forEach(s =>
-    warnings.push(`${s.name}: تغطية ${s.coveragePct}% — خطر!`))
+    warnings.push(`${s.name}: coverage ${s.coveragePct}% — danger!`))
   subjects.filter(s => s.daysSinceStudied !== null && s.daysSinceStudied >= 7 && s.coveragePct < 100).forEach(s =>
-    warnings.push(`ما ذاكرتش ${s.name} من ${s.daysSinceStudied} أيام`))
+    warnings.push(`Haven't studied ${s.name} in ${s.daysSinceStudied} days`))
   if (daysLeft !== null && daysLeft <= 7 && overallPct < 80)
-    warnings.push(`الامتحان بعد ${daysLeft} يوم وتغطيتك ${overallPct}% فقط!`)
+    warnings.push(`Exam in ${daysLeft} days and coverage is only ${overallPct}%!`)
 
   // Recommendations
   const recs: string[] = []
   const behind = subjects.filter(s => s.status === 'behind' || s.status === 'danger')
-  if (behind.length > 0) recs.push(`ركز على: ${behind.map(s => s.name).join('، ')}`)
-  if (daysLeft !== null && daysLeft < 14) recs.push('أضف جلسات مراجعة بدل مادة جديدة')
+  if (behind.length > 0) recs.push(`Focus on: ${behind.map(s => s.name).join(', ')}`)
+  if (daysLeft !== null && daysLeft < 14) recs.push('Add review sessions instead of new material')
   const stale = subjects.filter(s => s.daysSinceStudied !== null && s.daysSinceStudied >= 5 && s.coveragePct < 100)
-  if (stale.length > 0) recs.push(`اضف مراجعة لـ: ${stale.map(s => s.name).join('، ')}`)
+  if (stale.length > 0) recs.push(`Schedule a review for: ${stale.map(s => s.name).join(', ')}`)
 
   // ── AI-assisted risk analysis (Modular AI Architecture) ──────────────────────
   // AI reasons + suggests · server validates · deterministic output guaranteed
@@ -143,8 +143,8 @@ export async function getReadinessReport(userId: string): Promise<ReadinessRepor
 
   let aiAnalysis = {
     summary:               overallPct >= 70
-      ? 'أنت في الطريق الصح! استمر في الإيقاع ده وهتكون جاهز للامتحان.'
-      : 'محتاج تضغط أكتر. ركز على المواد الضعيفة وزود ساعات المذاكرة يومياً.',
+      ? 'You are on the right track! Keep up this pace and you will be ready for the exam.'
+      : 'You need to push harder. Focus on weaker subjects and increase daily study hours.',
     completionProbability: fallbackProb,
     riskLevel:             fallbackLevel,
     riskFactors:           warnings.slice(0, 3) as string[],
@@ -158,23 +158,23 @@ export async function getReadinessReport(userId: string): Promise<ReadinessRepor
     const raw = await generateAIResponse([
       {
         role: 'system',
-        content: `You are Zaker AI — an academic risk assessment engine for Arab university students.
+        content: `You are Zaker AI — an academic risk assessment engine for university students.
 YOUR ROLE: Analyze student progress data → predict exam readiness → return structured JSON.
 YOU ARE NOT A CHATBOT. Return ONLY valid JSON. No markdown. No explanation outside JSON.
 
 OUTPUT SCHEMA (return ONLY this JSON, nothing else):
 {
-  "summary": "<2 sentences in Arabic — honest and motivating>",
+  "summary": "<2 sentences in English — honest and motivating>",
   "completionProbability": <integer 0-100>,
   "riskLevel": "<low|medium|high|critical>",
-  "riskFactors": ["<Arabic risk factor>", "<Arabic risk factor>"]
+  "riskFactors": ["<English risk factor>", "<English risk factor>"]
 }
 
 SCORING RULES:
 - completionProbability = coverage_pct×0.4 + days_buffer×0.3 + consistency×0.3  (range 0-100)
 - low = 70-100 · medium = 45-69 · high = 25-44 · critical = 0-24
-- riskFactors: max 3 items, specific + actionable, Arabic only
-- summary: Arabic only, 2 sentences, honest but motivating`,
+- riskFactors: max 3 items, specific + actionable, English only
+- summary: English only, 2 sentences, honest but motivating`,
       },
       {
         role: 'user',
@@ -235,8 +235,8 @@ export async function getBehaviorInsights(userId: string): Promise<BehaviorData>
     return {
       bestDay: '—', worstDay: '—',
       avgCompletionRate: 0, studyStreak: 0,
-      insights: [{ label: 'البيانات', value: 'محتاج أكتر بيانات', icon: '📊', color: 'blue' }],
-      aiNarrative: 'ابدأ تسجل تاسكاتك اليومية عشان أقدر أحللك!',
+      insights: [{ label: 'Data', value: 'Need more data', icon: '📊', color: 'blue' }],
+      aiNarrative: 'Start logging your daily tasks so I can analyze your behavior!',
       hasEnoughData: false,
     }
   }
@@ -281,18 +281,18 @@ export async function getBehaviorInsights(userId: string): Promise<BehaviorData>
       return matched.length === 0 ? 0 : matched.filter(t => t.status === 'completed').length / matched.length
     }
     const diff = Math.round((rate(goodDays) - rate(poorDays)) * 100)
-    if (diff >= 10) sleepLine = `إنجازك أعلى بـ${diff}% بعد نوم 7+ ساعات 🌙`
+    if (diff >= 10) sleepLine = `Your output is ${diff}% higher after 7+ hours of sleep 🌙`
   }
 
   const insights: BehaviorInsight[] = [
-    { label: 'معدل الإنجاز', value: `${avgCompletionRate}%`, icon: '📊',
+    { label: 'Completion Rate', value: `${avgCompletionRate}%`, icon: '📊',
       color: avgCompletionRate >= 70 ? 'green' : avgCompletionRate >= 45 ? 'yellow' : 'red' },
-    { label: 'أحسن يوم', value: DAY_AR[bestDayIdx], icon: '⭐', color: 'green' },
-    { label: 'أضعف يوم', value: DAY_AR[worstDayIdx], icon: '⚠️', color: 'yellow' },
-    { label: 'أيام متواصلة', value: `${streak} يوم`, icon: '🔥',
+    { label: 'Best Day', value: DAY_EN[bestDayIdx], icon: '⭐', color: 'green' },
+    { label: 'Weakest Day', value: DAY_EN[worstDayIdx], icon: '⚠️', color: 'yellow' },
+    { label: 'Day Streak', value: `${streak} days`, icon: '🔥',
       color: streak >= 5 ? 'green' : streak >= 2 ? 'yellow' : 'red' },
   ]
-  if (sleepLine) insights.push({ label: 'تأثير النوم', value: sleepLine, icon: '🌙', color: 'blue' })
+  if (sleepLine) insights.push({ label: 'Sleep Impact', value: sleepLine, icon: '🌙', color: 'blue' })
 
   // AI narrative (Behavioral Intelligence endpoint)
   let aiNarrative = ''
@@ -300,29 +300,29 @@ export async function getBehaviorInsights(userId: string): Promise<BehaviorData>
     const raw = await generateAIResponse([
       {
         role: 'system',
-        content: `You are Zaker AI — a behavioral study coach for Arab university students.
+        content: `You are Zaker AI — a behavioral study coach for university students.
 YOUR ROLE: Analyze 30-day study behavior data → identify patterns → deliver concise personalized advice.
-YOU ARE NOT A CHATBOT. Return plain Arabic text only. 2 sentences max. No JSON. No markdown.`,
+YOU ARE NOT A CHATBOT. Return plain English text only. 2 sentences max. No JSON. No markdown.`,
       },
       {
         role: 'user',
         content: `30-day completion rate: ${avgCompletionRate}%
-Best study day: ${DAY_AR[bestDayIdx]} (${Math.round(bestRate * 100)}% completion)
-Worst study day: ${DAY_AR[worstDayIdx]} (${Math.round(worstRate * 100)}% completion)
+Best study day: ${DAY_EN[bestDayIdx]} (${Math.round(bestRate * 100)}% completion)
+Worst study day: ${DAY_EN[worstDayIdx]} (${Math.round(worstRate * 100)}% completion)
 Current streak: ${streak} consecutive days
 ${sleepLine ? `Sleep insight: ${sleepLine}` : ''}
 
-Give 2 sentences of specific, actionable advice in Arabic based on this data.`,
+Give 2 sentences of specific, actionable advice in English based on this data.`,
       },
     ], { maxTokens: 150, temperature: 0.6 })
     aiNarrative = raw
   } catch {
-    aiNarrative = `معدل إنجازك ${avgCompletionRate}%. جدول أصعب مواضيعك يوم ${DAY_AR[bestDayIdx]} لأنه أحسن أيامك.`
+    aiNarrative = `Your completion rate is ${avgCompletionRate}%. Schedule your hardest topics on ${DAY_EN[bestDayIdx]} — it's your best day.`
   }
 
   return {
-    bestDay: DAY_AR[bestDayIdx],
-    worstDay: DAY_AR[worstDayIdx],
+    bestDay: DAY_EN[bestDayIdx],
+    worstDay: DAY_EN[worstDayIdx],
     avgCompletionRate,
     studyStreak: streak,
     insights,
@@ -358,7 +358,7 @@ export async function getSmartAlerts(userId: string): Promise<SmartAlert[]> {
     alerts.push({
       id: 'overdue',
       level: overdueCount >= 5 ? 'danger' : 'warning',
-      message: `عندك ${overdueCount} task متأخرة لم تكتمل بعد`,
+      message: `You have ${overdueCount} overdue task${overdueCount !== 1 ? 's' : ''} not yet completed`,
     })
   }
 
@@ -366,9 +366,9 @@ export async function getSmartAlerts(userId: string): Promise<SmartAlert[]> {
   if (goal?.target_date) {
     const daysLeft = differenceInCalendarDays(parseISO(goal.target_date), new Date())
     if (daysLeft >= 0 && daysLeft <= 3)
-      alerts.push({ id: 'exam-critical', level: 'danger', message: `⚡ الامتحان بعد ${daysLeft} أيام فقط — ركز!` })
+      alerts.push({ id: 'exam-critical', level: 'danger', message: `⚡ Exam in ${daysLeft} days only — focus!` })
     else if (daysLeft >= 0 && daysLeft <= 7)
-      alerts.push({ id: 'exam-soon', level: 'warning', message: `الامتحان بعد ${daysLeft} أيام — تأكد من المراجعة` })
+      alerts.push({ id: 'exam-soon', level: 'warning', message: `Exam in ${daysLeft} days — make sure you review` })
   }
 
   // Subjects not studied for 7+ days
@@ -386,7 +386,7 @@ export async function getSmartAlerts(userId: string): Promise<SmartAlert[]> {
       alerts.push({
         id: `stale-${subj}`,
         level: days >= 10 ? 'danger' : 'warning',
-        message: `ما ذاكرتش ${subj} من ${days} أيام — بدأ النسيان!`,
+        message: `Haven't studied ${subj} in ${days} days — forgetting has started!`,
       })
     }
   }
@@ -406,7 +406,7 @@ export async function getSmartAlerts(userId: string): Promise<SmartAlert[]> {
     alerts.push({
       id: 'declining',
       level: 'warning',
-      message: `معدل إنجازك هذا الأسبوع انخفض — ارجع لإيقاعك السابق`,
+      message: `Your completion rate dropped this week — get back to your previous pace`,
     })
   }
 

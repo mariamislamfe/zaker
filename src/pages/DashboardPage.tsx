@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Clock, TrendingUp, Calendar, AlertCircle } from 'lucide-react'
+import { BookOpen, Clock, TrendingUp, Calendar, AlertCircle, Megaphone, X } from 'lucide-react'
 import { format } from 'date-fns'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { adaptiveReaction } from '../services/aiService'
 import { useTimerContext } from '../contexts/TimerContext'
 import { useSubjects } from '../hooks/useSubjects'
 import { useAnalytics } from '../hooks/useAnalytics'
@@ -15,14 +17,14 @@ import { formatHumanDuration } from '../utils/time'
 import { SleepWakeWidget } from '../components/ai/SleepWakeWidget'
 import { EditableTaskPanel } from '../components/ai/EditableTaskPanel'
 
+interface AdminMsg { id: string; title: string; content: string }
+
 export function DashboardPage() {
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
   const { subjects } = useSubjects()
   const { timerState, elapsed, breakElapsed, startSession, startBreak, endBreak, stopSession, discardSession } = useTimerContext()
   const { subjectStats, totalSeconds, loading: analyticsLoading } = useAnalytics('day')
   const { sessions: practiceSessions } = usePractice()
-
-  // Sum URT actual_seconds for today (local date)
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const urtTodaySeconds = practiceSessions
     .filter(s => format(new Date(s.created_at), 'yyyy-MM-dd') === todayStr)
@@ -34,6 +36,38 @@ export function DashboardPage() {
   )
   const [startError, setStartError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
+
+  // Adaptive reaction (early-stop AI toast)
+  const [aiToast,    setAiToast]    = useState<{ msg: string; icon: string } | null>(null)
+  const elapsedRef = useRef(elapsed)
+  useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
+  useEffect(() => {
+    if (!aiToast) return
+    const t = setTimeout(() => setAiToast(null), 7000)
+    return () => clearTimeout(t)
+  }, [aiToast])
+
+  async function handleStop() {
+    const snap = elapsedRef.current
+    await stopSession()
+    const reaction = adaptiveReaction(snap)
+    if (reaction) setAiToast(reaction)
+  }
+
+  // Admin messages
+  const [adminMsgs, setAdminMsgs] = useState<AdminMsg[]>([])
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!user) return
+    supabase
+      .from('admin_messages')
+      .select('id, title, content')
+      .eq('is_active', true)
+      .or(`target_user_id.is.null,target_user_id.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setAdminMsgs((data ?? []) as AdminMsg[]))
+  }, [user])
 
   // Sync selectedSubjectId with active session
   useEffect(() => {
@@ -69,8 +103,44 @@ export function DashboardPage() {
     return 'Good evening'
   })()
 
+  const visibleMsgs = adminMsgs.filter(m => !dismissedIds.has(m.id))
+
   return (
     <div className="space-y-8">
+      {/* Admin message banners */}
+      {visibleMsgs.map(m => (
+        <div
+          key={m.id}
+          className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200"
+        >
+          <Megaphone size={16} className="shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">{m.title}</p>
+            <p className="text-sm mt-0.5">{m.content}</p>
+          </div>
+          <button
+            onClick={() => setDismissedIds(prev => new Set([...prev, m.id]))}
+            className="shrink-0 p-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-900 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+
+      {/* AI adaptive reaction toast */}
+      {aiToast && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800 text-violet-800 dark:text-violet-200 animate-pulse-once">
+          <span className="text-lg shrink-0 leading-none mt-0.5">{aiToast.icon}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-violet-500 dark:text-violet-400 mb-0.5">AI · Motivation Drop Detected</p>
+            <p className="text-sm" dir="rtl">{aiToast.msg}</p>
+          </div>
+          <button onClick={() => setAiToast(null)} className="shrink-0 p-0.5 rounded hover:bg-violet-200 dark:hover:bg-violet-900 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -145,7 +215,7 @@ export function DashboardPage() {
           onStart={handleStart}
           onStartBreak={startBreak}
           onEndBreak={endBreak}
-          onStop={stopSession}
+          onStop={handleStop}
           onDiscard={discardSession}
           startLoading={starting}
         />
@@ -208,7 +278,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Today's tasks */}
-        <EditableTaskPanel date={todayStr} label="تاسكات النهارده" />
+        <EditableTaskPanel date={todayStr} label="Today's Tasks" />
       </div>
     </div>
   )

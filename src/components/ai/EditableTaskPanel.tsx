@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import {
   CheckCircle2, Circle, SkipForward, RotateCcw,
-  Trash2, Plus, Clock,
+  Trash2, Plus, Clock, AlertCircle,
 } from 'lucide-react'
 import { useStudyPlan } from '../../hooks/useStudyPlan'
 import type { PlanTask } from '../../types'
@@ -9,13 +9,14 @@ import type { PlanTask } from '../../types'
 // ─── Task row ─────────────────────────────────────────────────────────────────
 
 function TaskRow({
-  task, onComplete, onSkip, onReset, onDelete,
+  task, onComplete, onSkip, onReset, onDelete, overdue = false,
 }: {
   task:       PlanTask
   onComplete: (id: string) => void
   onSkip:     (id: string) => void
   onReset:    (id: string) => void
   onDelete:   (id: string) => void
+  overdue?:   boolean
 }) {
   const isDone    = task.status === 'completed'
   const isSkipped = task.status === 'skipped'
@@ -26,6 +27,7 @@ function TaskRow({
       'flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all group',
       isDone    ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 opacity-80' :
       isSkipped ? 'bg-zinc-50 dark:bg-zinc-800/50 border-zinc-200 dark:border-zinc-700 opacity-60' :
+      overdue   ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800' :
                   'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700',
     ].join(' ')}>
 
@@ -44,9 +46,15 @@ function TaskRow({
           {task.title}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
+          {overdue && (
+            <span className="text-[10px] font-semibold text-amber-500 flex items-center gap-0.5">
+              <AlertCircle size={9} />
+              {task.scheduled_date}
+            </span>
+          )}
           {task.subject_name && <span className="text-xs text-zinc-400">{task.subject_name}</span>}
           <span className="text-xs text-zinc-400 flex items-center gap-0.5">
-            <Clock size={9} />{task.duration_minutes}م
+            <Clock size={9} />{task.duration_minutes}m
           </span>
         </div>
       </div>
@@ -54,16 +62,16 @@ function TaskRow({
       {/* Actions */}
       <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         {isDone && (
-          <button onClick={() => onReset(task.id)} className="p-1 text-zinc-300 hover:text-zinc-500 transition-colors" title="تراجع">
+          <button onClick={() => onReset(task.id)} className="p-1 text-zinc-300 hover:text-zinc-500 transition-colors" title="Undo">
             <RotateCcw size={12} />
           </button>
         )}
         {isPending && (
-          <button onClick={() => onSkip(task.id)} className="p-1 text-zinc-300 hover:text-amber-400 transition-colors" title="تخطي">
+          <button onClick={() => onSkip(task.id)} className="p-1 text-zinc-300 hover:text-amber-400 transition-colors" title="Skip">
             <SkipForward size={13} />
           </button>
         )}
-        <button onClick={() => onDelete(task.id)} className="p-1 text-zinc-300 hover:text-red-400 transition-colors" title="حذف">
+        <button onClick={() => onDelete(task.id)} className="p-1 text-zinc-300 hover:text-red-400 transition-colors" title="Delete">
           <Trash2 size={12} />
         </button>
       </div>
@@ -94,7 +102,7 @@ function AddTaskForm({ onAdd }: { onAdd: (title: string, mins: number) => void }
         className="flex items-center gap-1.5 w-full px-3 py-2 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-700 text-xs text-zinc-400 hover:text-primary-500 hover:border-primary-300 dark:hover:border-primary-700 transition-colors"
       >
         <Plus size={13} />
-        <span>تاسك جديد</span>
+        <span>New Task</span>
       </button>
     )
   }
@@ -105,7 +113,7 @@ function AddTaskForm({ onAdd }: { onAdd: (title: string, mins: number) => void }
         autoFocus
         value={title}
         onChange={e => setTitle(e.target.value)}
-        placeholder="اسم التاسك"
+        placeholder="Task name"
         dir="rtl"
         className="flex-1 bg-transparent text-sm text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 outline-none min-w-0"
       />
@@ -117,7 +125,7 @@ function AddTaskForm({ onAdd }: { onAdd: (title: string, mins: number) => void }
         max={480}
         className="w-12 bg-transparent text-xs text-zinc-500 text-center outline-none border-x border-zinc-200 dark:border-zinc-700 px-1"
       />
-      <span className="text-xs text-zinc-400">م</span>
+      <span className="text-xs text-zinc-400">m</span>
       <button type="submit" className="text-xs px-2 py-1 rounded-lg bg-primary-600 text-white font-semibold hover:bg-primary-700 transition-colors">
         +
       </button>
@@ -132,12 +140,12 @@ function AddTaskForm({ onAdd }: { onAdd: (title: string, mins: number) => void }
 
 interface Props {
   date:  string   // 'yyyy-MM-dd'
-  label: string   // e.g. 'النهارده' | 'بكرا'
+  label: string   // e.g. 'Today' | 'Tomorrow'
 }
 
 export function EditableTaskPanel({ date, label }: Props) {
   const {
-    tasks, loading,
+    tasks, overdueTasks, loading,
     completedCount, totalCount, progressPct,
     completeTask, skipTask, resetTask, deleteTask, addTask,
   } = useStudyPlan(date)
@@ -162,6 +170,12 @@ export function EditableTaskPanel({ date, label }: Props) {
               {completedCount}/{totalCount}
             </span>
           )}
+          {overdueTasks.length > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+              <AlertCircle size={10} />
+              {overdueTasks.length} overdue
+            </span>
+          )}
         </div>
         {totalCount > 0 && (
           <span className="text-xs text-zinc-400">{progressPct}%</span>
@@ -182,8 +196,30 @@ export function EditableTaskPanel({ date, label }: Props) {
 
       {/* Task list + add form */}
       <div className="p-3 space-y-2">
-        {tasks.length === 0 ? (
-          <p className="text-xs text-zinc-400 text-center py-3">مفيش تاسكات — ضيف حاجة ⬇️</p>
+
+        {/* Overdue tasks from previous days */}
+        {overdueTasks.length > 0 && (
+          <>
+            {overdueTasks.map(task => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                overdue
+                onComplete={completeTask}
+                onSkip={skipTask}
+                onReset={resetTask}
+                onDelete={deleteTask}
+              />
+            ))}
+            {tasks.length > 0 && (
+              <div className="border-t border-zinc-100 dark:border-zinc-700 pt-1" />
+            )}
+          </>
+        )}
+
+        {/* Today's tasks */}
+        {tasks.length === 0 && overdueTasks.length === 0 ? (
+          <p className="text-xs text-zinc-400 text-center py-3">No tasks — add one ⬇️</p>
         ) : (
           tasks.map(task => (
             <TaskRow
@@ -196,6 +232,7 @@ export function EditableTaskPanel({ date, label }: Props) {
             />
           ))
         )}
+
         <AddTaskForm onAdd={addTask} />
       </div>
     </div>
