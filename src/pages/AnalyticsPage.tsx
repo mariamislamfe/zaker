@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, BarChart2, PieChart as PieIcon, Clock3, Moon, Sun } from 'lucide-react'
+import { ChevronLeft, ChevronRight, BarChart2, PieChart as PieIcon, Clock3, Moon, Sun, Pencil, Trash2, Plus } from 'lucide-react'
 import {
   addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, format,
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval,
@@ -12,6 +12,10 @@ import { StackedBarChart, SubjectPieChart } from '../components/analytics/StudyC
 import { Card, StatCard } from '../components/ui/Card'
 import { ColorDot } from '../components/ui/Badge'
 import { formatHumanDuration, toHours } from '../utils/time'
+import { EditSessionModal } from '../components/sessions/EditSessionModal'
+import { AddSessionModal } from '../components/sessions/AddSessionModal'
+import { supabase } from '../lib/supabase'
+import { format as fmtDate } from 'date-fns'
 import type { AnalyticsRange, DailyLog, DailyStats } from '../types'
 
 type ChartType = 'bar' | 'pie' | 'timeline'
@@ -249,12 +253,23 @@ function WastedTimeCard({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+type EditTarget = { id: string; durationSeconds: number; subjectName: string; subjectColor: string }
+
 export function AnalyticsPage() {
   const [range, setRange] = useState<AnalyticsRange>('week')
   const [chartType, setChartType] = useState<ChartType>('bar')
   const [refDate, setRefDate] = useState(new Date())
+  const [editTarget,    setEditTarget]    = useState<EditTarget | null>(null)
+  const [showAddModal,  setShowAddModal]  = useState(false)
+  const [deletingId,    setDeletingId]    = useState<string | null>(null)
 
-  const { subjectStats, dailyStats, timelineBlocks, totalSeconds, topSubject, loading, fromDateStr, toDateStr } = useAnalytics(range, refDate)
+  const { sessions, subjectStats, dailyStats, timelineBlocks, totalSeconds, topSubject, loading, fromDateStr, toDateStr } = useAnalytics(range, refDate)
+
+  async function deleteSession(id: string) {
+    setDeletingId(id)
+    await supabase.from('sessions').delete().eq('id', id)
+    setDeletingId(null)
+  }
   const { logs, saving: logSaving, saveLog } = useDailyLogs(fromDateStr, toDateStr)
 
   function navigate(direction: 'prev' | 'next') {
@@ -281,12 +296,40 @@ export function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
+
+      {/* Modals */}
+      {editTarget && (
+        <EditSessionModal
+          sessionId={editTarget.id}
+          currentDurationSeconds={editTarget.durationSeconds}
+          subjectName={editTarget.subjectName}
+          subjectColor={editTarget.subjectColor}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => setEditTarget(null)}
+        />
+      )}
+      {showAddModal && (
+        <AddSessionModal
+          defaultDate={range === 'day' ? fmtDate(refDate, 'yyyy-MM-dd') : undefined}
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => setShowAddModal(false)}
+        />
+      )}
+
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Analytics</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-          Track your study habits over time.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Analytics</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            Track your study habits over time.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950 border border-primary-200 dark:border-primary-800 transition-colors"
+        >
+          <Plus size={15} /> Log session
+        </button>
       </div>
 
       {/* Controls */}
@@ -352,7 +395,13 @@ export function AnalyticsPage() {
           <>
             {chartType === 'bar' && <StackedBarChart data={dailyStats} allSubjects={subjectStats} />}
             {chartType === 'pie' && <SubjectPieChart data={subjectStats} />}
-            {chartType === 'timeline' && <TimelineView blocks={timelineBlocks} date={refDate} />}
+            {chartType === 'timeline' && (
+              <TimelineView
+                blocks={timelineBlocks}
+                date={refDate}
+                onEditSession={(id, dur, name, color) => setEditTarget({ id, durationSeconds: dur, subjectName: name, subjectColor: color })}
+              />
+            )}
           </>
         )}
       </Card>
@@ -380,6 +429,64 @@ export function AnalyticsPage() {
                   </div>
                   <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: stat.subject_color }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* Sessions list */}
+      {sessions.length > 0 && (
+        <Card padding="lg">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+              Sessions · {sessions.length}
+            </h2>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1 text-xs text-primary-500 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors"
+            >
+              <Plus size={13} /> Log session
+            </button>
+          </div>
+          <div className="space-y-2">
+            {[...sessions].reverse().map(s => {
+              const subjectData = (s as unknown as { subject?: { name: string; color: string } }).subject
+              const subjectName  = subjectData?.name  ?? 'Unknown'
+              const subjectColor = subjectData?.color ?? '#6366f1'
+              const startTime = new Date(s.started_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+              const dateStr   = fmtDate(new Date(s.started_at), 'MMM d')
+              return (
+                <div key={s.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800/50 group transition-colors">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: subjectColor }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{subjectName}</p>
+                    <p className="text-xs text-zinc-400">{dateStr} · started {startTime}</p>
+                  </div>
+                  <span className="text-sm font-mono font-semibold text-zinc-600 dark:text-zinc-300 shrink-0">
+                    {formatHumanDuration(s.duration_seconds)}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setEditTarget({ id: s.id, durationSeconds: s.duration_seconds, subjectName, subjectColor })}
+                      className="p-1.5 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+                      title="Edit duration"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={() => deleteSession(s.id)}
+                      disabled={deletingId === s.id}
+                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-zinc-400 hover:text-red-500 transition-colors disabled:opacity-40"
+                      title="Delete session"
+                    >
+                      {deletingId === s.id
+                        ? <span className="w-3 h-3 border border-zinc-400 border-t-transparent rounded-full animate-spin inline-block" />
+                        : <Trash2 size={13} />
+                      }
+                    </button>
                   </div>
                 </div>
               )
