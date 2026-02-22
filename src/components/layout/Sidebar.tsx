@@ -1,10 +1,12 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, BookOpen, BarChart2, Users, LogOut, Sun, Moon, Zap, ClipboardList, GraduationCap, Brain,
+  LayoutDashboard, BookOpen, BarChart2, Users, LogOut, Sun, Moon, Zap, ClipboardList, GraduationCap, Brain, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
+
+const ADMIN_EMAIL = 'mariamislam.stem26@gmail.com'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -12,14 +14,15 @@ const NAV_ITEMS = [
   { label: 'Analytics', path: '/analytics', icon: BarChart2 },
   { label: 'URT Tracker', path: '/urt', icon: ClipboardList },
   { label: 'Curriculum', path: '/curriculum', icon: GraduationCap },
-  { label: 'AI Planner', path: '/ai-planner', icon: Brain },
-  { label: 'Social',     path: '/social',     icon: Users  },
+  { label: 'AI Planner',   path: '/ai-planner',  icon: Brain  },
+  { label: 'Social',       path: '/social',      icon: Users  },
 ]
 
 export function Sidebar() {
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+  const isAdmin = user?.email === ADMIN_EMAIL
 
   async function handleSignOut() {
     await signOut()
@@ -58,6 +61,23 @@ export function Sidebar() {
             {label}
           </NavLink>
         ))}
+
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              [
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                  : 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950',
+              ].join(' ')
+            }
+          >
+            <ShieldCheck size={18} />
+            Admin
+          </NavLink>
+        )}
       </nav>
 
       {/* Bottom section */}

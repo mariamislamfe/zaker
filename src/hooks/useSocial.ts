@@ -53,27 +53,22 @@ export function useGroups() {
   const joinGroupByCode = useCallback(async (inviteCode: string): Promise<Group> => {
     if (!user) throw new Error('Not authenticated')
 
-    const { data: group, error: groupErr } = await supabase
-      .from('groups')
-      .select('*')
-      .eq('invite_code', inviteCode.toUpperCase())
-      .single()
-
-    if (groupErr) throw new Error('Invalid invite code')
-
-    const { error: joinErr } = await supabase.from('group_members').insert({
-      group_id: group.id,
-      user_id: user.id,
-      role: 'member',
+    // Use a SECURITY DEFINER RPC so the invite-code lookup bypasses RLS.
+    // Direct table SELECT fails for private groups before the user has joined.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).rpc('join_group_by_code', {
+      p_code: inviteCode.trim().toUpperCase(),
     })
 
-    if (joinErr && !joinErr.message.includes('duplicate')) throw joinErr
+    if (error) throw new Error('Invalid invite code')
+
+    const group = (typeof data === 'string' ? JSON.parse(data) : data) as Group
 
     setGroups(prev => {
       if (prev.find(g => g.id === group.id)) return prev
-      return [...prev, group as Group]
+      return [...prev, group]
     })
-    return group as Group
+    return group
   }, [user])
 
   const leaveGroup = useCallback(async (groupId: string) => {

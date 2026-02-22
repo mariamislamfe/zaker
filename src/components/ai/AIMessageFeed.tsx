@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import {
   getDailyMessage, getWeeklyMessage, getMonthlyMessage,
@@ -9,9 +9,9 @@ import { useAuth } from '../../contexts/AuthContext'
 // ─── Type meta ────────────────────────────────────────────────────────────────
 
 const TYPE_META: Record<AIMessage['type'], { label: string; badge: string; dot: string }> = {
-  daily:   { label: 'تحليل يومي',   badge: 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300',   dot: 'bg-primary-500'   },
-  weekly:  { label: 'تحليل أسبوعي', badge: 'bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300',     dot: 'bg-violet-500'    },
-  monthly: { label: 'تحليل شهري',   badge: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300',          dot: 'bg-amber-500'     },
+  daily:   { label: 'Daily Analysis',   badge: 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300',   dot: 'bg-primary-500'   },
+  weekly:  { label: 'Weekly Analysis',  badge: 'bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300',     dot: 'bg-violet-500'    },
+  monthly: { label: 'Monthly Analysis', badge: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300',          dot: 'bg-amber-500'     },
 }
 
 // ─── Single message card ──────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ function MessageCard({
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-zinc-400">
             <Loader2 size={13} className="animate-spin shrink-0" />
-            <span>K2-Think بيحلل...</span>
+            <span>K2-Think analyzing...</span>
           </div>
         ) : msg ? (
           <>
@@ -72,12 +72,25 @@ function MessageCard({
             </p>
           </>
         ) : (
-          <p className="text-sm text-zinc-400">جاري التحميل...</p>
+          <p className="text-sm text-zinc-400">Loading...</p>
         )}
       </div>
     </div>
   )
 }
+
+// ─── Cache TTL per type ────────────────────────────────────────────────────────
+// daily  → always fresh (no in-session cache); auto-refreshes every 20 min
+// weekly → stale after 2 hours
+// monthly → stale after 6 hours
+
+const CACHE_TTL_MS: Record<AIMessage['type'], number> = {
+  daily:   0,              // no cache — always re-fetch
+  weekly:  2 * 60 * 60 * 1000,
+  monthly: 6 * 60 * 60 * 1000,
+}
+
+const DAILY_REFRESH_MS = 20 * 60 * 1000   // auto-refresh daily every 20 min
 
 // ─── Main feed ────────────────────────────────────────────────────────────────
 
@@ -90,45 +103,55 @@ export function AIMessageFeed() {
   const [loading, setLoading] = useState<Record<AIMessage['type'], boolean>>({
     daily: false, weekly: false, monthly: false,
   })
-  const [initialized, setInitialized] = useState(false)
 
   const loadMessage = useCallback(async (type: AIMessage['type'], force = false) => {
     if (!user) return
 
-    // Try cache first (unless forced refresh)
-    if (!force) {
+    const ttl = CACHE_TTL_MS[type]
+
+    // Try cache for weekly/monthly only (daily has TTL = 0 → always re-fetch)
+    if (!force && ttl > 0) {
       const cached = localStorage.getItem(msgCacheKey(type, user.id))
       if (cached) {
         try {
           const parsed = JSON.parse(cached) as AIMessage
-          setMessages(prev => ({ ...prev, [type]: parsed }))
-          return
-        } catch { /* invalid cache, regenerate */ }
+          const age    = Date.now() - new Date(parsed.generatedAt).getTime()
+          if (age < ttl) {
+            setMessages(prev => ({ ...prev, [type]: parsed }))
+            return
+          }
+        } catch { /* stale/corrupt cache — fall through */ }
       }
     }
 
     setLoading(prev => ({ ...prev, [type]: true }))
     try {
-      const fn = type === 'daily' ? getDailyMessage
-               : type === 'weekly' ? getWeeklyMessage
-               : getMonthlyMessage
+      const fn  = type === 'daily' ? getDailyMessage
+                : type === 'weekly' ? getWeeklyMessage
+                : getMonthlyMessage
       const msg = await fn(user.id)
-      localStorage.setItem(msgCacheKey(type, user.id), JSON.stringify(msg))
+      // Only cache weekly / monthly
+      if (ttl > 0) localStorage.setItem(msgCacheKey(type, user.id), JSON.stringify(msg))
       setMessages(prev => ({ ...prev, [type]: msg }))
-    } catch { /* silently fail — non-critical */ }
-    finally {
-      setLoading(prev => ({ ...prev, [type]: false }))
-    }
+    } catch { /* silently fail */ }
+    finally { setLoading(prev => ({ ...prev, [type]: false })) }
   }, [user])
 
+  // Initial load — all three in parallel
   useEffect(() => {
-    if (!user || initialized) return
-    setInitialized(true)
-    // Load all three in parallel
+    if (!user) return
     loadMessage('daily')
     loadMessage('weekly')
     loadMessage('monthly')
-  }, [user, initialized, loadMessage])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
+  // Auto-refresh daily every 20 minutes while the tab is open
+  useEffect(() => {
+    if (!user) return
+    const id = setInterval(() => loadMessage('daily'), DAILY_REFRESH_MS)
+    return () => clearInterval(id)
+  }, [user, loadMessage])
 
   const TYPES: AIMessage['type'][] = ['daily', 'weekly', 'monthly']
 

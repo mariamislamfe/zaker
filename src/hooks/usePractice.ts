@@ -110,5 +110,12 @@ export function usePractice() {
     await fetchSessions()
   }, [user, fetchSessions])
 
-  return { sessions, loading, saveSession, updateSession, getPassages, refetch: fetchSessions }
+  // Delete a session + its passages
+  const deleteSession = useCallback(async (sessionId: string) => {
+    setSessions(prev => prev.filter(s => s.id !== sessionId))
+    await supabase.from('practice_passages').delete().eq('practice_session_id', sessionId)
+    await supabase.from('practice_sessions').delete().eq('id', sessionId)
+  }, [])
+
+  return { sessions, loading, saveSession, updateSession, getPassages, deleteSession, refetch: fetchSessions }
 }
