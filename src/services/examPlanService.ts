@@ -166,7 +166,12 @@ export async function generateExamPlan(
 
   // ── Distribute across study days ─────────────────────────────────────────────
   const studyDays = Math.max(1, daysLeft - 1)  // last day = exam day
-  const inserts: object[] = []
+  type TaskInsert = {
+    plan_id: string; user_id: string; subject_id: string | null; subject_name: string
+    title: string; scheduled_date: string; duration_minutes: number
+    status: string; priority: number; order_index: number
+  }
+  const inserts: TaskInsert[] = []
   let unitIdx = 0
 
   for (let d = 0; d < studyDays && unitIdx < units.length; d++) {
@@ -234,7 +239,14 @@ export async function getExamPlanStatus(
     .order('scheduled_date')
     .order('order_index')
 
-  const tasks = (allTasks ?? []) as TaskSummary[]
+  const tasks: TaskSummary[] = (allTasks ?? []).map(r => ({
+    id:              r.id as string,
+    title:           r.title as string,
+    status:          r.status as string,
+    durationMinutes: r.duration_minutes as number,
+    subjectName:     r.subject_name as string | null,
+    scheduledDate:   r.scheduled_date as string,
+  }))
 
   const totalTasks     = tasks.length
   const completedTasks = tasks.filter(t => t.status === 'completed').length
