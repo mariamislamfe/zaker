@@ -5,15 +5,24 @@ import type { TimerState, BreakType } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface LastSession {
+  id: string
+  durationSeconds: number
+  subjectId: string
+}
+
 interface TimerContextValue {
   timerState: TimerState
   elapsed: number
   breakElapsed: number
+  lastSession: LastSession | null
   startSession: (subjectId: string) => Promise<void>
   startBreak: (type: BreakType) => Promise<void>
   endBreak: () => Promise<void>
   stopSession: () => Promise<void>
   discardSession: () => Promise<void>
+  editSession: (sessionId: string, newDurationSeconds: number) => Promise<void>
+  clearLastSession: () => void
 }
 
 const TimerContext = createContext<TimerContextValue | undefined>(undefined)
@@ -57,6 +66,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [timerState, setTimerState] = useState<TimerState>(loadState)
   const [elapsed, setElapsed] = useState(0)
   const [breakElapsed, setBreakElapsed] = useState(0)
+  const [lastSession, setLastSession] = useState<LastSession | null>(null)
   const stateRef = useRef<TimerState>(timerState)
 
   // Keep ref in sync for use in the interval
@@ -153,8 +163,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       .update({ ended_at: now, duration_seconds: studySeconds, status: 'completed' })
       .eq('id', s.sessionId)
 
+    setLastSession({ id: s.sessionId, durationSeconds: studySeconds, subjectId: s.subjectId! })
     update(DEFAULT_STATE); clear(); setElapsed(0); setBreakElapsed(0)
   }, [user, update])
+
+  // ─── Edit completed session ────────────────────────────────────────────────
+  const editSession = useCallback(async (sessionId: string, newDurationSeconds: number) => {
+    await supabase.from('sessions').update({ duration_seconds: newDurationSeconds }).eq('id', sessionId)
+  }, [])
+
+  const clearLastSession = useCallback(() => setLastSession(null), [])
 
   // ─── Discard ───────────────────────────────────────────────────────────────
   const discardSession = useCallback(async () => {
@@ -166,8 +184,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <TimerContext.Provider value={{
-      timerState, elapsed, breakElapsed,
+      timerState, elapsed, breakElapsed, lastSession,
       startSession, startBreak, endBreak, stopSession, discardSession,
+      editSession, clearLastSession,
     }}>
       {children}
     </TimerContext.Provider>

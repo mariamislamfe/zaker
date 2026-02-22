@@ -5,12 +5,13 @@ import { formatDuration } from '../../utils/time'
 interface TimelineViewProps {
   blocks: TimelineBlock[]
   date: Date
+  onEditSession?: (sessionId: string, durationSeconds: number, subjectName: string, subjectColor: string) => void
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0..23
 const MINUTES_IN_DAY = 1440
 
-export function TimelineView({ blocks, date }: TimelineViewProps) {
+export function TimelineView({ blocks, date, onEditSession }: TimelineViewProps) {
   const [tooltip, setTooltip] = useState<{
     block: TimelineBlock
     x: number
@@ -63,12 +64,18 @@ export function TimelineView({ blocks, date }: TimelineViewProps) {
             return (
               <div
                 key={block.session_id}
-                className="absolute top-2 bottom-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+                className="absolute top-2 bottom-2 rounded-lg cursor-pointer transition-opacity hover:opacity-80 hover:ring-2 hover:ring-white/60"
                 style={{
                   left: `${leftPct}%`,
                   width: `${Math.max(widthPct, 0.5)}%`,
                   backgroundColor: block.subject_color,
                 }}
+                onClick={() => onEditSession?.(
+                  block.session_id,
+                  block.duration_minutes * 60,
+                  block.subject_name,
+                  block.subject_color,
+                )}
                 onMouseEnter={e => {
                   const rect = (e.target as HTMLElement).getBoundingClientRect()
                   setTooltip({ block, x: rect.left, y: rect.bottom })
@@ -101,6 +108,7 @@ export function TimelineView({ blocks, date }: TimelineViewProps) {
             {(tooltip.block.start_minutes % 60).toString().padStart(2, '0')}
           </p>
           <p>Duration: {formatDuration(tooltip.block.duration_minutes * 60)}</p>
+          {onEditSession && <p className="text-zinc-400 mt-1">Click to edit</p>}
         </div>
       )}
     </div>

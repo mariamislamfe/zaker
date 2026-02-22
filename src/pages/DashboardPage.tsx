@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Clock, TrendingUp, Calendar, AlertCircle, Megaphone, X } from 'lucide-react'
+import { BookOpen, Clock, TrendingUp, Calendar, AlertCircle, Megaphone, X, Pencil, Plus } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -16,13 +16,15 @@ import { ColorDot } from '../components/ui/Badge'
 import { formatHumanDuration } from '../utils/time'
 import { SleepWakeWidget } from '../components/ai/SleepWakeWidget'
 import { EditableTaskPanel } from '../components/ai/EditableTaskPanel'
+import { EditSessionModal } from '../components/sessions/EditSessionModal'
+import { AddSessionModal } from '../components/sessions/AddSessionModal'
 
 interface AdminMsg { id: string; title: string; content: string }
 
 export function DashboardPage() {
   const { user, profile } = useAuth()
   const { subjects } = useSubjects()
-  const { timerState, elapsed, breakElapsed, startSession, startBreak, endBreak, stopSession, discardSession } = useTimerContext()
+  const { timerState, elapsed, breakElapsed, lastSession, startSession, startBreak, endBreak, stopSession, discardSession, editSession, clearLastSession } = useTimerContext()
   const { subjectStats, totalSeconds, loading: analyticsLoading } = useAnalytics('day')
   const { sessions: practiceSessions } = usePractice()
   const todayStr = format(new Date(), 'yyyy-MM-dd')
@@ -36,6 +38,10 @@ export function DashboardPage() {
   )
   const [startError, setStartError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
+
+  // Session modals
+  const [showAddSession,  setShowAddSession]  = useState(false)
+  const [editingSession,  setEditingSession]  = useState<{ id: string; durationSeconds: number; subjectName: string; subjectColor: string } | null>(null)
 
   // Adaptive reaction (early-stop AI toast)
   const [aiToast,    setAiToast]    = useState<{ msg: string; icon: string } | null>(null)
@@ -105,8 +111,55 @@ export function DashboardPage() {
 
   const visibleMsgs = adminMsgs.filter(m => !dismissedIds.has(m.id))
 
+  // Subject lookup helper for lastSession banner
+  const lastSessionSubject = lastSession
+    ? subjects.find(s => s.id === lastSession.subjectId)
+    : null
+
   return (
     <div className="space-y-8">
+      {/* ── Modals ───────────────────────────────────────────────────────────── */}
+      {showAddSession && (
+        <AddSessionModal
+          onClose={() => setShowAddSession(false)}
+          onSaved={() => setShowAddSession(false)}
+        />
+      )}
+      {editingSession && (
+        <EditSessionModal
+          sessionId={editingSession.id}
+          currentDurationSeconds={editingSession.durationSeconds}
+          subjectName={editingSession.subjectName}
+          subjectColor={editingSession.subjectColor}
+          onClose={() => setEditingSession(null)}
+          onSaved={() => setEditingSession(null)}
+        />
+      )}
+      {/* ── Session saved banner ─────────────────────────────────────────── */}
+      {lastSession && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+          <p className="flex-1 text-sm font-medium">
+            Session saved · <span className="font-bold font-mono">{formatHumanDuration(lastSession.durationSeconds)}</span>
+            {lastSessionSubject && <span className="text-emerald-600 dark:text-emerald-400"> · {lastSessionSubject.name}</span>}
+          </p>
+          <button
+            onClick={() => setEditingSession({
+              id: lastSession.id,
+              durationSeconds: lastSession.durationSeconds,
+              subjectName: lastSessionSubject?.name ?? 'Session',
+              subjectColor: lastSessionSubject?.color ?? '#6366f1',
+            })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-semibold hover:bg-emerald-200 dark:hover:bg-emerald-800/50 transition-colors"
+          >
+            <Pencil size={12} /> Edit time
+          </button>
+          <button onClick={clearLastSession} className="p-1 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Admin message banners */}
       {visibleMsgs.map(m => (
         <div
@@ -151,8 +204,15 @@ export function DashboardPage() {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        {/* Compact sleep/wake tracker */}
-        <div className="shrink-0 pt-1">
+        {/* Compact sleep/wake tracker + log session button */}
+        <div className="shrink-0 pt-1 flex items-center gap-2">
+          <button
+            onClick={() => setShowAddSession(true)}
+            title="Log a past session"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 transition-colors"
+          >
+            <Plus size={13} /> Log session
+          </button>
           <SleepWakeWidget compact />
         </div>
       </div>
