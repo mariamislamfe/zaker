@@ -26,6 +26,14 @@ interface UserRow {
   full_name: string | null
 }
 
+interface UserStudyStat {
+  user_id: string
+  username: string
+  full_name: string | null
+  total_seconds: number
+  session_count: number
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AdminPage() {
@@ -41,8 +49,10 @@ function AdminDashboard() {
   const { user } = useAuth()
 
   // ── Stats ────────────────────────────────────────────────────────────────
-  const [userCount, setUserCount]   = useState<number | null>(null)
-  const [totalHours, setTotalHours] = useState<number | null>(null)
+  const [userCount,    setUserCount]    = useState<number | null>(null)
+  const [totalHours,   setTotalHours]   = useState<number | null>(null)
+  const [userStats,    setUserStats]    = useState<UserStudyStat[]>([])
+  const [rpcAvailable, setRpcAvailable] = useState(true)
 
   // ── Message composer ─────────────────────────────────────────────────────
   const [title, setTitle]         = useState('')
@@ -59,17 +69,33 @@ function AdminDashboard() {
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true)
-    const [profilesRes, sessionsRes, messagesRes, usersRes] = await Promise.all([
+
+    const [profilesRes, messagesRes, usersRes, totalRes, userStatsRes] = await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact', head: true }),
-      supabase.from('sessions').select('duration_seconds'),
       supabase.from('admin_messages').select('*').order('created_at', { ascending: false }),
       supabase.from('profiles').select('id, username, full_name').order('username'),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).rpc('admin_get_total_study_seconds') as Promise<{ data: number | null; error: unknown }>,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).rpc('admin_get_user_study_stats')    as Promise<{ data: UserStudyStat[] | null; error: unknown }>,
     ])
+
     setUserCount(profilesRes.count ?? 0)
-    const totalSec = (sessionsRes.data ?? []).reduce((s, r) => s + (r.duration_seconds ?? 0), 0)
-    setTotalHours(totalSec)
     setMessages((messagesRes.data ?? []) as AdminMessage[])
     setUsers((usersRes.data ?? []) as UserRow[])
+
+    if (totalRes.error || userStatsRes.error) {
+      // RPC not created yet — fall back to own-user sessions with a warning
+      setRpcAvailable(false)
+      const { data: fallback } = await supabase.from('sessions').select('duration_seconds').eq('status', 'completed')
+      setTotalHours((fallback ?? []).reduce((s, r) => s + (r.duration_seconds ?? 0), 0))
+      setUserStats([])
+    } else {
+      setRpcAvailable(true)
+      setTotalHours(totalRes.data ?? 0)
+      setUserStats(userStatsRes.data ?? [])
+    }
+
     setLoadingStats(false)
   }, [])
 
@@ -126,10 +152,56 @@ function AdminDashboard() {
         <StatCard
           label="Total Study Time"
           value={loadingStats ? '…' : formatHumanDuration(totalHours ?? 0)}
-          sub="across all users"
+          sub={rpcAvailable ? 'across all users' : 'your data only — run SQL first'}
           icon={<Clock size={18} />}
         />
       </div>
+
+      {/* RPC missing warning */}
+      {!loadingStats && !rpcAvailable && (
+        <div className="px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
+          <p className="font-semibold mb-1">⚠️ Admin RPC functions not found</p>
+          <p className="text-xs">Run <code className="font-mono bg-amber-100 dark:bg-amber-900 px-1 rounded">supabase/admin_stats.sql</code> in your Supabase SQL editor to see stats for all users.</p>
+        </div>
+      )}
+
+      {/* Per-user study breakdown */}
+      {!loadingStats && userStats.length > 0 && (
+        <Card padding="lg">
+          <h2 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wide mb-4">
+            Study Time by User
+          </h2>
+          <div className="space-y-2">
+            {userStats.map((u, idx) => {
+              const pct = (totalHours ?? 0) > 0 ? (u.total_seconds / (totalHours ?? 1)) * 100 : 0
+              return (
+                <div key={u.user_id}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-zinc-400 w-5 text-right">#{idx + 1}</span>
+                      <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{u.username}</span>
+                      {u.full_name && <span className="text-xs text-zinc-400">{u.full_name}</span>}
+                      <span className="text-xs text-zinc-400">{u.session_count} session{u.session_count !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold font-mono text-zinc-700 dark:text-zinc-300">
+                        {formatHumanDuration(u.total_seconds)}
+                      </span>
+                      <span className="text-xs text-zinc-400 ml-2">{pct.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary-500 transition-all duration-700"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Message Composer */}
       <Card padding="lg">
