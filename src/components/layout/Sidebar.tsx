@@ -15,7 +15,6 @@ const NAV_ITEMS = [
   { label: 'URT Tracker', path: '/urt', icon: ClipboardList },
   { label: 'Curriculum', path: '/curriculum', icon: GraduationCap },
   { label: 'AI Planner',   path: '/ai-planner',  icon: Brain  },
-  { label: 'Social',       path: '/social',      icon: Users  },
 ]
 
 export function Sidebar() {
