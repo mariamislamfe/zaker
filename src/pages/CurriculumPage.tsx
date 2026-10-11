@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Trash2, Check, BookOpen, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, Check, BookOpen, ChevronRight, RotateCcw } from 'lucide-react'
 import { useCurriculum } from '../hooks/useCurriculum'
 import { useSubjects } from '../hooks/useSubjects'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { Modal } from '../components/ui/Modal'
 import type { CurriculumItem, Subject } from '../types'
 
 // ─── Shared progress button (works standalone or in a table cell) ───────────────
@@ -402,8 +403,25 @@ function SubjectPanel({
 
 export function CurriculumPage() {
   const { subjects, loading: subjectsLoading } = useSubjects()
-  const { items, loading: itemsLoading, addLO, addLesson, toggleProgress, deleteItem, lessonsByLO } = useCurriculum()
+  const { items, loading: itemsLoading, addLO, addLesson, toggleProgress, deleteItem, resetAll, lessonsByLO } = useCurriculum()
   const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+
+  async function confirmReset() {
+    setResetting(true)
+    setResetError(null)
+    try {
+      await resetAll()
+      setResetOpen(false)
+    } catch (err) {
+      const msg = (err as { message?: string } | null)?.message
+      setResetError(msg ? `Reset failed: ${msg}` : 'Reset failed.')
+    } finally {
+      setResetting(false)
+    }
+  }
 
   const activeSubjects = subjects.filter(s => s.is_active)
   const currentSubjectId = activeSubjectId ?? activeSubjects[0]?.id ?? null
@@ -413,12 +431,40 @@ export function CurriculumPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Curriculum</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Track LOs per subject — studied · reviewed · solved
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Curriculum</h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Track LOs per subject — studied · reviewed · solved
+          </p>
+        </div>
+        {items.length > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<RotateCcw size={14} />}
+            onClick={() => { setResetError(null); setResetOpen(true) }}
+          >
+            Reset
+          </Button>
+        )}
       </div>
+
+      <Modal open={resetOpen} onClose={() => !resetting && setResetOpen(false)} title="Reset curriculum?" maxWidth="sm">
+        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+          This will permanently delete <b>all {items.length} items</b> (every LO and lesson, in all subjects)
+          along with their studied / reviewed / solved progress. This can't be undone.
+        </p>
+        {resetError && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{resetError}</p>}
+        <div className="flex gap-3 pt-5">
+          <Button variant="secondary" className="flex-1" disabled={resetting} onClick={() => setResetOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" className="flex-1" loading={resetting} onClick={confirmReset}>
+            Yes, delete everything
+          </Button>
+        </div>
+      </Modal>
 
       {/* No active subjects */}
       {!loading && activeSubjects.length === 0 && (

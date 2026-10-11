@@ -78,6 +78,14 @@ export function useCurriculum() {
     // DB CASCADE handles child deletion
   }, [])
 
+  // Wipe every curriculum item of the current user (all subjects). Throws on failure.
+  const resetAll = useCallback(async () => {
+    if (!user) return
+    const { error } = await supabase.from('curriculum_items').delete().eq('user_id', user.id)
+    if (error) throw error
+    setItems([])
+  }, [user])
+
   // Lessons grouped by LO id
   const lessonsByLO = useMemo(() => {
     const map = new Map<string, CurriculumItem[]>()
@@ -90,5 +98,5 @@ export function useCurriculum() {
     return map
   }, [items])
 
-  return { items, loading, addLO, addLesson, toggleProgress, deleteItem, lessonsByLO, refetch: fetchItems }
+  return { items, loading, addLO, addLesson, toggleProgress, deleteItem, resetAll, lessonsByLO, refetch: fetchItems }
 }
