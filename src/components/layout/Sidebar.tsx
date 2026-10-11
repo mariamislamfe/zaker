@@ -1,7 +1,7 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, BookOpen, BarChart2, Trophy, LogOut, Sun, Moon, Zap, ClipboardList, GraduationCap, ShieldCheck, Settings,
+  LayoutDashboard, BookOpen, BarChart2, Trophy, LogOut, Sun, Moon, Zap, ClipboardList, GraduationCap, ShieldCheck, Settings, ListChecks,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Subjects', path: '/subjects', icon: BookOpen },
   { label: 'Analytics', path: '/analytics', icon: BarChart2 },
+  { label: 'Routine', path: '/routine', icon: ListChecks },
   { label: 'Rank', path: '/social', icon: Trophy },
   // URT is a STEM-only exam tracker
   { label: 'URT Tracker', path: '/urt', icon: ClipboardList, stemOnly: true },

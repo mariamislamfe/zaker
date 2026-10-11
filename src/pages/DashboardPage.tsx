@@ -16,7 +16,6 @@ import { ColorDot } from '../components/ui/Badge'
 import { formatHumanDuration } from '../utils/time'
 import { SleepWakeWidget } from '../components/sleep/SleepWakeWidget'
 import { EditableTaskPanel } from '../components/tasks/EditableTaskPanel'
-import { RoutineTasksTab } from '../components/tasks/RoutineTasksTab'
 import { EditSessionModal } from '../components/sessions/EditSessionModal'
 import { AddSessionModal } from '../components/sessions/AddSessionModal'
 
@@ -341,9 +340,6 @@ export function DashboardPage() {
         {/* Today's tasks */}
         <EditableTaskPanel date={todayStr} label="Today's Tasks" />
       </div>
-
-      {/* Daily / weekly / monthly routine tasks */}
-      <RoutineTasksTab />
     </div>
   )
 }
