@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Clock, TrendingUp, Calendar, AlertCircle, Megaphone, X, Pencil, Plus } from 'lucide-react'
+import { BookOpen, Clock, TrendingUp, Calendar, AlertCircle, Megaphone, X, Pencil, Plus, BellRing } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,6 +9,7 @@ import { useTimerContext } from '../contexts/TimerContext'
 import { useSubjects } from '../hooks/useSubjects'
 import { useAnalytics } from '../hooks/useAnalytics'
 import { usePractice } from '../hooks/usePractice'
+import { useReminders } from '../hooks/useCalendarEvents'
 import { TimerDisplay } from '../components/timer/TimerDisplay'
 import { TimerControls } from '../components/timer/TimerControls'
 import { Card, StatCard } from '../components/ui/Card'
@@ -27,6 +28,7 @@ export function DashboardPage() {
   const { timerState, elapsed, breakElapsed, lastSession, startSession, startBreak, endBreak, stopSession, discardSession, editSession, clearLastSession } = useTimerContext()
   const { subjectStats, totalSeconds, loading: analyticsLoading } = useAnalytics('day')
   const { sessions: practiceSessions } = usePractice()
+  const { reminders, toggleDone: completeReminder } = useReminders()
   const todayStr = format(new Date(), 'yyyy-MM-dd')
   const urtTodaySeconds = practiceSessions
     .filter(s => format(new Date(s.created_at), 'yyyy-MM-dd') === todayStr)
@@ -179,6 +181,39 @@ export function DashboardPage() {
           </button>
         </div>
       ))}
+
+      {/* Calendar reminders — stay until marked done */}
+      {reminders.length > 0 && (
+        <div className="rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 px-4 py-3">
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-rose-600 dark:text-rose-400">
+            <BellRing size={13} /> Reminders
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {reminders.map(r => (
+              <li key={r.id} className="flex items-center gap-3">
+                <button
+                  onClick={() => completeReminder(r.id, true)}
+                  title="Mark as done"
+                  className="w-5 h-5 rounded-md border-2 border-rose-300 dark:border-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900 shrink-0"
+                />
+                <span dir="auto" className="flex-1 min-w-0 truncate text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                  {r.title}
+                </span>
+                <span className={[
+                  'text-xs font-semibold shrink-0',
+                  r.daysLeft < 0 ? 'text-red-600 dark:text-red-400' : 'text-rose-600 dark:text-rose-400',
+                ].join(' ')}>
+                  {r.daysLeft < 0
+                    ? `Overdue by ${-r.daysLeft}d`
+                    : r.daysLeft === 0 ? 'Today'
+                    : r.daysLeft === 1 ? 'Tomorrow'
+                    : `In ${r.daysLeft} days`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Early-stop feedback toast */}
       {aiToast && (
