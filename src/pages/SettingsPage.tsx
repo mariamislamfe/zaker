@@ -48,7 +48,9 @@ export function SettingsPage() {
       })
       setSaved(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save settings.')
+      // Supabase errors are plain objects with a `message`, not Error instances.
+      const msg = (err as { message?: string } | null)?.message
+      setError(msg ? `Failed to save settings: ${msg}` : 'Failed to save settings.')
     } finally {
       setSaving(false)
     }
