@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import type { Group, GroupMember, LeaderboardEntry } from '../types'
+import type { Group, GroupMember, LeaderboardEntry, UniversityRankEntry } from '../types'
 
 export function useGroups() {
   const { user } = useAuth()
@@ -104,41 +104,86 @@ export function useGroupMembers(groupId: string | null) {
   return { members, loading }
 }
 
-export function useLeaderboard(groupId?: string, daysBack = 7) {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([])
+// RPC rows come back untyped; one mapper keeps the three leaderboards consistent.
+function toEntry(row: Record<string, unknown>): LeaderboardEntry {
+  return {
+    user_id: row.user_id as string,
+    display_name: row.display_name as string,
+    education_level: (row.education_level as string | null) ?? null,
+    hs_track: (row.hs_track as string | null) ?? null,
+    university: (row.university as string | null) ?? null,
+    faculty: (row.faculty as string | null) ?? null,
+    total_seconds: Number(row.total_seconds),
+    rank: Number(row.rank),
+  }
+}
+
+// Fetch helper shared by the ranking hooks: re-runs when `key` changes, ignores stale responses.
+function useRpcList<T>(
+  key: string,
+  call: () => PromiseLike<{ data: unknown; error: unknown }>,
+  map: (row: Record<string, unknown>) => T,
+) {
+  const [rows, setRows] = useState<T[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetch = async () => {
-      setLoading(true)
-      let data: Record<string, unknown>[] = []
-
-      if (groupId) {
-        const { data: rows } = await supabase.rpc('get_group_leaderboard', {
-          p_group_id: groupId,
-          days_back: daysBack,
-        })
-        data = rows ?? []
-      } else {
-        const { data: rows } = await supabase.rpc('get_leaderboard', { days_back: daysBack })
-        data = rows ?? []
-      }
-
-      setEntries(
-        data.map((row, i) => ({
-          user_id: row.user_id as string,
-          username: row.username as string,
-          full_name: row.full_name as string | null,
-          avatar_url: row.avatar_url as string | null,
-          total_seconds: Number(row.total_seconds),
-          rank: i + 1,
-        }))
-      )
+    let cancelled = false
+    setLoading(true)
+    call().then(({ data }) => {
+      if (cancelled) return
+      setRows(((data ?? []) as Record<string, unknown>[]).map(map))
       setLoading(false)
-    }
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
 
-    fetch()
-  }, [groupId, daysBack])
+  return { rows, loading }
+}
 
-  return { entries, loading }
+export function useGroupLeaderboard(groupId: string, daysBack: number) {
+  const { rows, loading } = useRpcList(
+    `${groupId}|${daysBack}`,
+    () => supabase.rpc('get_group_leaderboard', { p_group_id: groupId, days_back: daysBack }),
+    toEntry,
+  )
+  return { entries: rows, loading }
+}
+
+export interface StudentFilter {
+  level?: string
+  track?: string
+  university?: string
+  faculty?: string
+}
+
+export function useStudentRanking(filter: StudentFilter, daysBack: number) {
+  const { rows, loading } = useRpcList(
+    `${JSON.stringify(filter)}|${daysBack}`,
+    () => supabase.rpc('get_ranked_students', {
+      p_days: daysBack,
+      p_level: filter.level ?? null,
+      p_track: filter.track ?? null,
+      p_university: filter.university ?? null,
+      p_faculty: filter.faculty ?? null,
+    }),
+    toEntry,
+  )
+  return { entries: rows, loading }
+}
+
+export function useUniversityRanking(faculty: string | null, daysBack: number) {
+  const { rows, loading } = useRpcList<UniversityRankEntry>(
+    `${faculty}|${daysBack}`,
+    () => supabase.rpc('get_university_ranking', { p_days: daysBack, p_faculty: faculty }),
+    row => ({
+      university: row.university as string,
+      student_count: Number(row.student_count),
+      total_seconds: Number(row.total_seconds),
+      avg_seconds: Number(row.avg_seconds),
+      rank: Number(row.rank),
+    }),
+  )
+  return { entries: rows, loading }
 }

@@ -4,7 +4,7 @@ import { BookOpen, Clock, TrendingUp, Calendar, AlertCircle, Megaphone, X, Penci
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { adaptiveReaction } from '../services/aiService'
+import { earlyStopFeedback } from '../utils/sessionFeedback'
 import { useTimerContext } from '../contexts/TimerContext'
 import { useSubjects } from '../hooks/useSubjects'
 import { useAnalytics } from '../hooks/useAnalytics'
@@ -14,8 +14,9 @@ import { TimerControls } from '../components/timer/TimerControls'
 import { Card, StatCard } from '../components/ui/Card'
 import { ColorDot } from '../components/ui/Badge'
 import { formatHumanDuration } from '../utils/time'
-import { SleepWakeWidget } from '../components/ai/SleepWakeWidget'
-import { EditableTaskPanel } from '../components/ai/EditableTaskPanel'
+import { SleepWakeWidget } from '../components/sleep/SleepWakeWidget'
+import { EditableTaskPanel } from '../components/tasks/EditableTaskPanel'
+import { RoutineTasksTab } from '../components/tasks/RoutineTasksTab'
 import { EditSessionModal } from '../components/sessions/EditSessionModal'
 import { AddSessionModal } from '../components/sessions/AddSessionModal'
 
@@ -43,7 +44,7 @@ export function DashboardPage() {
   const [showAddSession,  setShowAddSession]  = useState(false)
   const [editingSession,  setEditingSession]  = useState<{ id: string; durationSeconds: number; subjectName: string; subjectColor: string } | null>(null)
 
-  // Adaptive reaction (early-stop AI toast)
+  // Early-stop feedback toast
   const [aiToast,    setAiToast]    = useState<{ msg: string; icon: string } | null>(null)
   const elapsedRef = useRef(elapsed)
   useEffect(() => { elapsedRef.current = elapsed }, [elapsed])
@@ -56,7 +57,7 @@ export function DashboardPage() {
   async function handleStop() {
     const snap = elapsedRef.current
     await stopSession()
-    const reaction = adaptiveReaction(snap)
+    const reaction = earlyStopFeedback(snap)
     if (reaction) setAiToast(reaction)
   }
 
@@ -180,12 +181,12 @@ export function DashboardPage() {
         </div>
       ))}
 
-      {/* AI adaptive reaction toast */}
+      {/* Early-stop feedback toast */}
       {aiToast && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-800 text-violet-800 dark:text-violet-200 animate-pulse-once">
           <span className="text-lg shrink-0 leading-none mt-0.5">{aiToast.icon}</span>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wide text-violet-500 dark:text-violet-400 mb-0.5">AI · Motivation Drop Detected</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-violet-500 dark:text-violet-400 mb-0.5">Session feedback</p>
             <p className="text-sm" dir="rtl">{aiToast.msg}</p>
           </div>
           <button onClick={() => setAiToast(null)} className="shrink-0 p-0.5 rounded hover:bg-violet-200 dark:hover:bg-violet-900 transition-colors">
@@ -340,6 +341,9 @@ export function DashboardPage() {
         {/* Today's tasks */}
         <EditableTaskPanel date={todayStr} label="Today's Tasks" />
       </div>
+
+      {/* Daily / weekly / monthly routine tasks */}
+      <RoutineTasksTab />
     </div>
   )
 }

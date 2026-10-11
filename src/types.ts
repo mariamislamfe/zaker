@@ -6,7 +6,11 @@ export interface Profile {
   full_name: string | null
   avatar_url: string | null
   created_at: string
-  hidden_from_leaderboard?: boolean
+  nickname: string | null
+  education_level: 'high_school' | 'university' | null
+  hs_track: 'national' | 'stem' | 'american' | null
+  university: string | null
+  faculty: 'medicine' | 'engineering' | null
 }
 
 // ─── Subjects ─────────────────────────────────────────────────────────────────
@@ -122,10 +126,20 @@ export interface GroupMember {
 
 export interface LeaderboardEntry {
   user_id: string
-  username: string
-  full_name: string | null
-  avatar_url: string | null
+  display_name: string       // nickname, or username when none is set
+  education_level: string | null
+  hs_track: string | null
+  university: string | null
+  faculty: string | null
   total_seconds: number
+  rank: number
+}
+
+export interface UniversityRankEntry {
+  university: string
+  student_count: number
+  total_seconds: number
+  avg_seconds: number
   rank: number
 }
 

@@ -120,8 +120,11 @@ Open [http://localhost:5173](http://localhost:5173)
 
 ### Database functions
 
-- `get_leaderboard(days_back)` — Global top 100 users by study time
+- `get_ranked_students(p_days, p_level, p_track, p_university, p_faculty)` — Student ranking (top 100 + you), optional filters
+- `get_university_ranking(p_days, p_faculty)` — Universities ranked by total study time
 - `get_group_leaderboard(group_id, days_back)` — Per-group rankings
+
+Run `supabase/profile_education_ranking.sql` after `schema.sql` (adds nickname/education columns and these functions).
 
 ### Row Level Security
 

@@ -3,12 +3,21 @@ import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../types'
 
+// Profile fields collected at signup; the handle_new_user trigger copies them into profiles.
+export interface SignUpExtra {
+  nickname?: string
+  education_level?: string
+  hs_track?: string
+  university?: string
+  faculty?: string
+}
+
 interface AuthContextValue {
   user: User | null
   session: Session | null
   profile: Profile | null
   loading: boolean
-  signUp: (email: string, password: string, username: string, fullName: string) => Promise<void>
+  signUp: (email: string, password: string, username: string, fullName: string, extra?: SignUpExtra) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<void>
@@ -76,12 +85,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function signUp(email: string, password: string, username: string, fullName: string) {
+  async function signUp(email: string, password: string, username: string, fullName: string, extra: SignUpExtra = {}) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { username, full_name: fullName },
+        data: { username, full_name: fullName, ...extra },
       },
     })
     if (error) throw error

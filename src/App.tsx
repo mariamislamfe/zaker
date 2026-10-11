@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { TimerProvider } from './contexts/TimerContext'
 import { Layout } from './components/layout/Layout'
+import { isStem } from './lib/education'
 
 // Lazy-load pages — each route gets its own JS chunk for faster initial load
 const AuthPage            = lazy(() => import('./pages/AuthPage').then(m => ({ default: m.AuthPage })))
@@ -13,7 +14,7 @@ const AnalyticsPage       = lazy(() => import('./pages/AnalyticsPage').then(m =>
 const SocialPage          = lazy(() => import('./pages/SocialPage').then(m => ({ default: m.SocialPage })))
 const PracticeTrackerPage = lazy(() => import('./pages/PracticeTrackerPage').then(m => ({ default: m.PracticeTrackerPage })))
 const CurriculumPage      = lazy(() => import('./pages/CurriculumPage').then(m => ({ default: m.CurriculumPage })))
-const AIPlannerPage       = lazy(() => import('./pages/AIPlannerPage').then(m => ({ default: m.AIPlannerPage })))
+const SettingsPage        = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 const AdminPage           = lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })))
 
 function PageLoader() {
@@ -42,6 +43,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// URT is only for STEM students; everyone else is sent back to the dashboard.
+function StemRoute({ children }: { children: React.ReactNode }) {
+  const { profile } = useAuth()
+  if (!isStem(profile)) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<FullScreenLoader />}>
@@ -59,9 +67,9 @@ function AppRoutes() {
           <Route path="subjects" element={<Suspense fallback={<PageLoader />}><SubjectsPage /></Suspense>} />
           <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>} />
           <Route path="social" element={<Suspense fallback={<PageLoader />}><SocialPage /></Suspense>} />
-          <Route path="urt" element={<Suspense fallback={<PageLoader />}><PracticeTrackerPage /></Suspense>} />
+          <Route path="urt" element={<StemRoute><Suspense fallback={<PageLoader />}><PracticeTrackerPage /></Suspense></StemRoute>} />
           <Route path="curriculum" element={<Suspense fallback={<PageLoader />}><CurriculumPage /></Suspense>} />
-          <Route path="ai-planner"   element={<Suspense fallback={<PageLoader />}><AIPlannerPage /></Suspense>} />
+          <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
           <Route path="admin"         element={<Suspense fallback={<PageLoader />}><AdminPage /></Suspense>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

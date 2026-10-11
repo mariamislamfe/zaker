@@ -5,6 +5,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+import {
+  EducationFields, EMPTY_EDUCATION, validateEducation, type EducationValue,
+} from '../components/profile/EducationFields'
 
 type Mode = 'login' | 'signup'
 
@@ -17,6 +20,8 @@ export function AuthPage() {
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
+  const [nickname, setNickname] = useState('')
+  const [education, setEducation] = useState<EducationValue>(EMPTY_EDUCATION)
   const [showPass, setShowPass] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +40,15 @@ export function AuthPage() {
         await signIn(email, password)
       } else {
         if (username.length < 3) throw new Error('Username must be at least 3 characters.')
-        await signUp(email, password, username, fullName)
+        const eduError = validateEducation(education)
+        if (eduError) throw new Error(eduError)
+        await signUp(email, password, username, fullName, {
+          nickname: nickname.trim() || undefined,
+          education_level: education.level ?? undefined,
+          hs_track: education.level === 'high_school' ? education.track ?? undefined : undefined,
+          university: education.level === 'university' ? education.university.trim() : undefined,
+          faculty: education.level === 'university' ? education.faculty ?? undefined : undefined,
+        })
         setSuccess('Account created! Check your email to confirm your address.')
       }
     } catch (err) {
@@ -141,8 +154,17 @@ export function AuthPage() {
                   value={username}
                   onChange={e => setUsername(e.target.value.toLowerCase())}
                   leftIcon={<span className="text-xs font-bold">@</span>}
-                  hint="Minimum 3 characters, used in leaderboards."
+                  hint="Minimum 3 characters."
                 />
+                <Input
+                  label="Nickname (optional)"
+                  type="text"
+                  placeholder="Shown on the leaderboard instead of your username"
+                  value={nickname}
+                  onChange={e => setNickname(e.target.value)}
+                  maxLength={24}
+                />
+                <EducationFields value={education} onChange={setEducation} />
               </>
             )}
 
