@@ -287,6 +287,18 @@ export interface SleepLog {
   created_at: string
 }
 
+// ─── Calendar ──────────────────────────────────────────────────────────────────
+
+export interface CalendarEvent {
+  id: string
+  user_id: string
+  title: string
+  event_date: string          // 'yyyy-MM-dd'
+  remind_days_before: number  // reminder shows on the dashboard from this many days before
+  done: boolean
+  created_at: string
+}
+
 // ─── UI ───────────────────────────────────────────────────────────────────────
 
 export type Theme = 'light' | 'dark'

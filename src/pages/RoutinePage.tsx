@@ -4,18 +4,18 @@ import {
 } from 'date-fns'
 import { CheckCircle2, Circle, SkipForward, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { EditableTaskPanel } from '../components/tasks/EditableTaskPanel'
-import { RoutineTasksTab } from '../components/tasks/RoutineTasksTab'
+import { CalendarTab } from '../components/tasks/CalendarTab'
 import { Card } from '../components/ui/Card'
 import { useTaskArchive } from '../hooks/useTaskArchive'
 import type { PlanTask } from '../types'
 
-type Tab = 'today' | 'archive' | 'lists'
+type Tab = 'today' | 'archive' | 'calendar'
 type Mode = 'day' | 'week' | 'month'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'today',   label: '☀️ Today' },
   { id: 'archive', label: '🗂️ Archive' },
-  { id: 'lists',   label: '🔁 Weekly / Monthly lists' },
+  { id: 'calendar', label: '📅 Calendar' },
 ]
 
 const ymd = (d: Date) => format(d, 'yyyy-MM-dd')
@@ -215,7 +215,7 @@ export function RoutinePage() {
         </div>
       )}
       {tab === 'archive' && <Archive />}
-      {tab === 'lists' && <RoutineTasksTab />}
+      {tab === 'calendar' && <CalendarTab />}
     </div>
   )
 }
