@@ -1,50 +1,105 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  Users, Plus, LogIn, Trophy, Crown, Medal, Copy, Check, Globe, Lock, Eye, EyeOff,
+  Users, Plus, LogIn, Trophy, Crown, Medal, Copy, Check, Globe, Lock, Building2, GraduationCap, UserCircle,
 } from 'lucide-react'
-import { useGroups, useGroupMembers, useLeaderboard } from '../hooks/useSocial'
+import { useGroups, useGroupLeaderboard, useStudentRanking, useUniversityRanking } from '../hooks/useSocial'
+import type { StudentFilter } from '../hooks/useSocial'
 import { useAuth } from '../contexts/AuthContext'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input, Textarea } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import { formatHumanDuration } from '../utils/time'
+import { FACULTIES, educationSummary, facultyLabel, getEducation, trackLabel } from '../lib/education'
 import type { Group, LeaderboardEntry } from '../types'
 
+type Tab = 'students' | 'universities' | 'groups'
+
+const PERIODS = [
+  { days: 1,  label: 'Today' },
+  { days: 7,  label: '7 days' },
+  { days: 30, label: '30 days' },
+]
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+        active
+          ? 'bg-primary-600 border-primary-600 text-white'
+          : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function SocialPage() {
-  const { user, profile, updateProfile } = useAuth()
+  const { user, profile } = useAuth()
   const { groups, loading: groupsLoading, createGroup, joinGroupByCode, leaveGroup } = useGroups()
-  const { entries: globalEntries, loading: globalLoading } = useLeaderboard(undefined, 7)
+  const edu = getEducation(profile)
 
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
-  const [tab, setTab] = useState<'groups' | 'global'>('groups')
-  const [togglingHide, setTogglingHide] = useState(false)
+  const [tab, setTab] = useState<Tab>('students')
+  const [days, setDays] = useState(7)
+  const [scopeId, setScopeId] = useState('all')
+  const [uniFaculty, setUniFaculty] = useState<string | null>(null)
 
-  const isHidden = profile?.hidden_from_leaderboard ?? false
+  // Student scopes depend on who is looking: a high-school student sees their track,
+  // a university student sees their faculty (all universities) and their own university.
+  const scopes = useMemo(() => {
+    const list: { id: string; label: string; filter: StudentFilter }[] = [
+      { id: 'all', label: 'All students', filter: {} },
+    ]
+    if (edu.level === 'high_school' && edu.track) {
+      list.push({ id: 'track', label: `${trackLabel(edu.track)} students`, filter: { track: edu.track } })
+    }
+    if (edu.level === 'university') {
+      if (edu.faculty) {
+        list.push({
+          id: 'faculty',
+          label: `All ${facultyLabel(edu.faculty)}`,
+          filter: { level: 'university', faculty: edu.faculty },
+        })
+      }
+      if (edu.university) {
+        list.push({
+          id: 'university',
+          label: edu.university,
+          filter: { level: 'university', university: edu.university },
+        })
+      }
+    }
+    return list
+  }, [edu.level, edu.track, edu.faculty, edu.university])
 
-  async function toggleHide() {
-    setTogglingHide(true)
-    try { await updateProfile({ hidden_from_leaderboard: !isHidden }) } finally { setTogglingHide(false) }
-  }
+  const scope = scopes.find(s => s.id === scopeId) ?? scopes[0]
+  const { entries: studentEntries, loading: studentsLoading } = useStudentRanking(scope.filter, days)
+  const { entries: uniEntries, loading: unisLoading } = useUniversityRanking(uniFaculty, days)
 
-  // Filter self from display when hidden
-  const displayedGlobalEntries = isHidden
-    ? globalEntries.filter(e => e.user_id !== user?.id)
-    : globalEntries
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'students',     label: '🎓 Students' },
+    { id: 'universities', label: '🏛️ Universities' },
+    { id: 'groups',       label: '👥 My Groups' },
+  ]
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Social</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Rank</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Compete with friends and track global rankings.
+            See where you stand among students, universities and your groups.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Button variant="secondary" icon={<LogIn size={15} />} onClick={() => setJoinOpen(true)}>
             Join Group
           </Button>
@@ -54,25 +109,120 @@ export function SocialPage() {
         </div>
       </div>
 
-      {/* Tab switcher */}
-      <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 w-fit">
-        {(['groups', 'global'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={[
-              'px-4 py-1.5 rounded-md text-sm font-medium capitalize transition-colors',
-              tab === t
-                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300',
-            ].join(' ')}
-          >
-            {t === 'global' ? '🌍 Global' : '👥 My Groups'}
-          </button>
-        ))}
+      {/* Nickname hint */}
+      {!profile?.nickname && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-xs text-primary-700 dark:text-primary-300">
+          <UserCircle size={14} className="shrink-0" />
+          <span>
+            Ranks show your username <b>{profile?.username}</b>.{' '}
+            <Link to="/settings" className="underline font-semibold">Set a nickname</Link> to show that instead.
+          </span>
+        </div>
+      )}
+
+      {/* Tab switcher + period */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 w-fit">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={[
+                'px-4 py-1.5 rounded-md text-sm font-medium transition-colors',
+                tab === t.id
+                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300',
+              ].join(' ')}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          {PERIODS.map(p => (
+            <Chip key={p.days} active={days === p.days} onClick={() => setDays(p.days)}>{p.label}</Chip>
+          ))}
+        </div>
       </div>
 
-      {/* Groups tab */}
+      {/* Students */}
+      {tab === 'students' && (
+        <Card padding="lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy size={18} className="text-amber-500" />
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Student Ranking</h2>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-5">
+            {scopes.map(s => (
+              <Chip key={s.id} active={scope.id === s.id} onClick={() => setScopeId(s.id)}>{s.label}</Chip>
+            ))}
+          </div>
+          {studentsLoading ? (
+            <LeaderboardSkeleton />
+          ) : (
+            <LeaderboardTable entries={studentEntries} currentUserId={user?.id ?? ''} />
+          )}
+        </Card>
+      )}
+
+      {/* Universities */}
+      {tab === 'universities' && (
+        <Card padding="lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Building2 size={18} className="text-amber-500" />
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">University Ranking</h2>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-5">
+            <Chip active={uniFaculty === null} onClick={() => setUniFaculty(null)}>All faculties</Chip>
+            {FACULTIES.map(f => (
+              <Chip key={f.value} active={uniFaculty === f.value} onClick={() => setUniFaculty(f.value)}>
+                {f.label}
+              </Chip>
+            ))}
+          </div>
+          {unisLoading ? (
+            <LeaderboardSkeleton />
+          ) : uniEntries.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-400">No universities yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {uniEntries.map(u => {
+                const mine = !!edu.university && u.university.toLowerCase() === edu.university.trim().toLowerCase()
+                return (
+                  <div
+                    key={u.university}
+                    className={[
+                      'flex items-center gap-3 px-4 py-3 rounded-xl transition-colors',
+                      mine
+                        ? 'bg-primary-50 dark:bg-primary-950 border-2 border-primary-200 dark:border-primary-800'
+                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800',
+                    ].join(' ')}
+                  >
+                    <div className="w-6 flex items-center justify-center shrink-0"><RankBadge rank={u.rank} /></div>
+                    <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-primary-700 dark:text-primary-300 shrink-0">
+                      <GraduationCap size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                        <span className="truncate">{u.university}</span>
+                        {mine && <span className="text-xs bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded-full shrink-0">Yours</span>}
+                      </p>
+                      <p className="text-xs text-zinc-400">
+                        {u.student_count} student{u.student_count === 1 ? '' : 's'} · avg {formatHumanDuration(u.avg_seconds)}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold font-mono text-zinc-700 dark:text-zinc-300 shrink-0">
+                      {formatHumanDuration(u.total_seconds)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Groups */}
       {tab === 'groups' && (
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Group list */}
@@ -126,6 +276,7 @@ export function SocialPage() {
             {selectedGroup ? (
               <GroupLeaderboard
                 group={selectedGroup}
+                days={days}
                 currentUserId={user?.id ?? ''}
                 onLeave={() => { leaveGroup(selectedGroup.id); setSelectedGroup(null) }}
               />
@@ -139,47 +290,6 @@ export function SocialPage() {
             )}
           </div>
         </div>
-      )}
-
-      {/* Global leaderboard tab */}
-      {tab === 'global' && (
-        <Card padding="lg">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2">
-              <Trophy size={18} className="text-amber-500" />
-              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                Global Leaderboard
-              </h2>
-              <span className="text-xs text-zinc-400 ml-1">— last 7 days</span>
-            </div>
-            {/* Hide from leaderboard toggle */}
-            <button
-              onClick={toggleHide}
-              disabled={togglingHide}
-              title={isHidden ? 'You are hidden — click to reappear' : 'Click to hide yourself from the leaderboard'}
-              className={[
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
-                isHidden
-                  ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100'
-                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700',
-              ].join(' ')}
-            >
-              {isHidden ? <EyeOff size={13} /> : <Eye size={13} />}
-              {isHidden ? 'Hidden from rank' : 'Hide from rank'}
-            </button>
-          </div>
-          {isHidden && (
-            <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
-              <EyeOff size={13} />
-              You are currently hidden from the global leaderboard.
-            </div>
-          )}
-          {globalLoading ? (
-            <LeaderboardSkeleton />
-          ) : (
-            <LeaderboardTable entries={displayedGlobalEntries} currentUserId={user?.id ?? ''} />
-          )}
-        </Card>
       )}
 
       {/* Modals */}
@@ -200,11 +310,11 @@ export function SocialPage() {
 // ─── Group Leaderboard ────────────────────────────────────────────────────────
 
 function GroupLeaderboard({
-  group, currentUserId, onLeave,
+  group, days, currentUserId, onLeave,
 }: {
-  group: Group; currentUserId: string; onLeave: () => void
+  group: Group; days: number; currentUserId: string; onLeave: () => void
 }) {
-  const { entries, loading } = useLeaderboard(group.id, 7)
+  const { entries, loading } = useGroupLeaderboard(group.id, days)
   const [copied, setCopied] = useState(false)
 
   function copyCode() {
@@ -248,6 +358,13 @@ function GroupLeaderboard({
 
 // ─── Leaderboard Table ────────────────────────────────────────────────────────
 
+function RankBadge({ rank }: { rank: number }) {
+  if (rank === 1) return <Crown size={16} className="text-amber-400" />
+  if (rank === 2) return <Medal size={16} className="text-zinc-400" />
+  if (rank === 3) return <Medal size={16} className="text-amber-600" />
+  return <span className="text-xs font-bold text-zinc-400 font-mono w-4 text-center">#{rank}</span>
+}
+
 function LeaderboardTable({ entries, currentUserId }: { entries: LeaderboardEntry[]; currentUserId: string }) {
   if (entries.length === 0) {
     return <p className="py-8 text-center text-sm text-zinc-400">No data yet.</p>
@@ -257,11 +374,7 @@ function LeaderboardTable({ entries, currentUserId }: { entries: LeaderboardEntr
     <div className="space-y-2">
       {entries.map(entry => {
         const isMe = entry.user_id === currentUserId
-        const rankIcon =
-          entry.rank === 1 ? <Crown size={16} className="text-amber-400" /> :
-          entry.rank === 2 ? <Medal size={16} className="text-zinc-400" /> :
-          entry.rank === 3 ? <Medal size={16} className="text-amber-600" /> :
-          <span className="text-xs font-bold text-zinc-400 font-mono w-4 text-center">#{entry.rank}</span>
+        const subtitle = educationSummary(entry)
 
         return (
           <div
@@ -274,22 +387,20 @@ function LeaderboardTable({ entries, currentUserId }: { entries: LeaderboardEntr
             ].join(' ')}
           >
             {/* Rank */}
-            <div className="w-6 flex items-center justify-center shrink-0">{rankIcon}</div>
+            <div className="w-6 flex items-center justify-center shrink-0"><RankBadge rank={entry.rank} /></div>
 
             {/* Avatar */}
             <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center text-sm font-semibold text-primary-700 dark:text-primary-300 shrink-0">
-              {entry.username?.[0]?.toUpperCase() ?? '?'}
+              {entry.display_name?.[0]?.toUpperCase() ?? '?'}
             </div>
 
             {/* Name */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                {entry.username}
-                {isMe && <span className="text-xs bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded-full">You</span>}
+                <span className="truncate">{entry.display_name}</span>
+                {isMe && <span className="text-xs bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded-full shrink-0">You</span>}
               </p>
-              {entry.full_name && (
-                <p className="text-xs text-zinc-400 truncate">{entry.full_name}</p>
-              )}
+              {subtitle && <p className="text-xs text-zinc-400 truncate">{subtitle}</p>}
             </div>
 
             {/* Time */}

@@ -1,10 +1,11 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, BookOpen, BarChart2, Users, LogOut, Sun, Moon, Zap, ClipboardList, GraduationCap, Brain, ShieldCheck,
+  LayoutDashboard, BookOpen, BarChart2, Trophy, LogOut, Sun, Moon, Zap, ClipboardList, GraduationCap, ShieldCheck, Settings,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import { isStem } from '../../lib/education'
 
 const ADMIN_EMAIL = 'mariamislam.stem26@gmail.com'
 
@@ -12,9 +13,11 @@ const NAV_ITEMS = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Subjects', path: '/subjects', icon: BookOpen },
   { label: 'Analytics', path: '/analytics', icon: BarChart2 },
-  { label: 'URT Tracker', path: '/urt', icon: ClipboardList },
+  { label: 'Rank', path: '/social', icon: Trophy },
+  // URT is a STEM-only exam tracker
+  { label: 'URT Tracker', path: '/urt', icon: ClipboardList, stemOnly: true },
   { label: 'Curriculum', path: '/curriculum', icon: GraduationCap },
-  { label: 'AI Planner',   path: '/ai-planner',  icon: Brain  },
+  { label: 'Settings', path: '/settings', icon: Settings },
 ]
 
 export function Sidebar() {
@@ -42,7 +45,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {NAV_ITEMS.map(({ label, path, icon: Icon }) => (
+        {NAV_ITEMS.filter(item => !item.stemOnly || isStem(profile)).map(({ label, path, icon: Icon }) => (
           <NavLink
             key={path}
             to={path}
@@ -97,7 +100,7 @@ export function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
-              {profile?.username ?? 'User'}
+              {profile?.nickname || profile?.username || 'User'}
             </p>
             <p className="text-xs text-zinc-400 truncate">{profile?.full_name}</p>
           </div>

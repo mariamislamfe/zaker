@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
 import { supabase }           from '../lib/supabase'
 import { useAuth }            from '../contexts/AuthContext'
-import { generateNextDayPlan, adjustPlan } from '../services/aiEngine'
 import type { PlanTask, StudyPlan } from '../types'
 
 export function useStudyPlan(date?: string) {
@@ -13,7 +12,6 @@ export function useStudyPlan(date?: string) {
   const [tasks,        setTasks]        = useState<PlanTask[]>([])
   const [overdueTasks, setOverdueTasks] = useState<PlanTask[]>([])
   const [loading,      setLoading]      = useState(true)
-  const [generating,   setGenerating]   = useState(false)
   const [error,        setError]        = useState<string | null>(null)
 
   // ── Fetch plan + tasks for targetDate ─────────────────────────────────────
@@ -143,29 +141,6 @@ export function useStudyPlan(date?: string) {
     await supabase.from('plan_tasks').delete().eq('id', taskId)
   }, [])
 
-  // ── Generate tomorrow's plan via AI ───────────────────────────────────────
-  const generateTomorrowPlan = useCallback(async () => {
-    if (!user) return
-    setGenerating(true)
-    setError(null)
-    try {
-      await generateNextDayPlan(user.id)
-      await fetchPlan()
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to generate plan')
-    } finally {
-      setGenerating(false)
-    }
-  }, [user, fetchPlan])
-
-  // ── Reschedule overdue tasks ──────────────────────────────────────────────
-  const rescheduleOverdue = useCallback(async () => {
-    if (!user) return
-    const { adjusted } = await adjustPlan(user.id)
-    if (adjusted > 0) await fetchPlan()
-    return adjusted
-  }, [user, fetchPlan])
-
   // ── Summary stats ─────────────────────────────────────────────────────────
   const completedCount = tasks.filter(t => t.status === 'completed').length
   const totalCount     = tasks.length
@@ -175,10 +150,9 @@ export function useStudyPlan(date?: string) {
   const progressPct    = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return {
-    plan, tasks, overdueTasks, loading, generating, error,
+    plan, tasks, overdueTasks, loading, error,
     completedCount, totalCount, plannedMinutes, doneMinutes, progressPct,
     completeTask, skipTask, resetTask, addTask, deleteTask,
-    generateTomorrowPlan, rescheduleOverdue,
     refetch: fetchPlan,
   }
 }

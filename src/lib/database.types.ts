@@ -13,7 +13,11 @@ export type Database = {
           full_name: string | null
           avatar_url: string | null
           created_at: string
-          hidden_from_leaderboard: boolean
+          nickname: string | null
+          education_level: 'high_school' | 'university' | null
+          hs_track: 'national' | 'stem' | 'american' | null
+          university: string | null
+          faculty: 'medicine' | 'engineering' | null
         }
         Insert: {
           id: string
@@ -21,7 +25,11 @@ export type Database = {
           full_name?: string | null
           avatar_url?: string | null
           created_at?: string
-          hidden_from_leaderboard?: boolean
+          nickname?: string | null
+          education_level?: 'high_school' | 'university' | null
+          hs_track?: 'national' | 'stem' | 'american' | null
+          university?: string | null
+          faculty?: 'medicine' | 'engineering' | null
         }
         Update: {
           id?: string
@@ -29,7 +37,11 @@ export type Database = {
           full_name?: string | null
           avatar_url?: string | null
           created_at?: string
-          hidden_from_leaderboard?: boolean
+          nickname?: string | null
+          education_level?: 'high_school' | 'university' | null
+          hs_track?: 'national' | 'stem' | 'american' | null
+          university?: string | null
+          faculty?: 'medicine' | 'engineering' | null
         }
         Relationships: []
       }
@@ -467,23 +479,46 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_leaderboard: {
-        Args: { days_back?: number }
+      get_ranked_students: {
+        Args: {
+          p_days?: number
+          p_level?: string | null
+          p_track?: string | null
+          p_university?: string | null
+          p_faculty?: string | null
+        }
         Returns: {
           user_id: string
-          username: string
-          full_name: string | null
-          avatar_url: string | null
+          display_name: string
+          education_level: string | null
+          hs_track: string | null
+          university: string | null
+          faculty: string | null
           total_seconds: number
+          rank: number
+        }[]
+      }
+      get_university_ranking: {
+        Args: { p_days?: number; p_faculty?: string | null }
+        Returns: {
+          university: string
+          student_count: number
+          total_seconds: number
+          avg_seconds: number
+          rank: number
         }[]
       }
       get_group_leaderboard: {
         Args: { p_group_id: string; days_back?: number }
         Returns: {
           user_id: string
-          username: string
-          full_name: string | null
+          display_name: string
+          education_level: string | null
+          hs_track: string | null
+          university: string | null
+          faculty: string | null
           total_seconds: number
+          rank: number
         }[]
       }
     }
