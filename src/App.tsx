@@ -14,7 +14,8 @@ const AnalyticsPage       = lazy(() => import('./pages/AnalyticsPage').then(m =>
 const SocialPage          = lazy(() => import('./pages/SocialPage').then(m => ({ default: m.SocialPage })))
 const PracticeTrackerPage = lazy(() => import('./pages/PracticeTrackerPage').then(m => ({ default: m.PracticeTrackerPage })))
 const CurriculumPage      = lazy(() => import('./pages/CurriculumPage').then(m => ({ default: m.CurriculumPage })))
-const SettingsPage        = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const RoutinePage         = lazy(() => import('./pages/RoutinePage').then(m => ({ default: m.RoutinePage })))
+const SettingsPage       = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 const AdminPage           = lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })))
 
 function PageLoader() {
@@ -69,6 +70,7 @@ function AppRoutes() {
           <Route path="social" element={<Suspense fallback={<PageLoader />}><SocialPage /></Suspense>} />
           <Route path="urt" element={<StemRoute><Suspense fallback={<PageLoader />}><PracticeTrackerPage /></Suspense></StemRoute>} />
           <Route path="curriculum" element={<Suspense fallback={<PageLoader />}><CurriculumPage /></Suspense>} />
+          <Route path="routine" element={<Suspense fallback={<PageLoader />}><RoutinePage /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
           <Route path="admin"         element={<Suspense fallback={<PageLoader />}><AdminPage /></Suspense>} />
         </Route>
