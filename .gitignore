@@ -19,3 +19,9 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+
+# Private / local files
+.env*.local
+CLAUDE.md
+AGENTS.md
+.claude/
